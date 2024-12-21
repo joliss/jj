@@ -31,6 +31,8 @@ use crate::backend::Commit;
 use crate::backend::CommitId;
 use crate::backend::Conflict;
 use crate::backend::ConflictId;
+use crate::backend::CopyHistory;
+use crate::backend::CopyId;
 use crate::backend::CopyRecord;
 use crate::backend::FileId;
 use crate::backend::SigningFn;
@@ -182,6 +184,14 @@ impl Backend for SecretBackend {
         sign_with: Option<&mut SigningFn>,
     ) -> BackendResult<(CommitId, Commit)> {
         self.inner.write_commit(contents, sign_with).await
+    }
+
+    fn read_copy(&self, _id: &CopyId) -> BackendResult<CopyHistory> {
+        unimplemented!();
+    }
+
+    fn write_copy(&self, _contents: &CopyHistory) -> BackendResult<CopyId> {
+        unimplemented!();
     }
 
     fn get_copy_records(

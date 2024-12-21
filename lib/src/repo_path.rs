@@ -191,7 +191,7 @@ impl DoubleEndedIterator for RepoPathComponentsIter<'_> {
 impl FusedIterator for RepoPathComponentsIter<'_> {}
 
 /// Owned repository path.
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(ContentHash, Clone, Eq, Hash, PartialEq)]
 pub struct RepoPathBuf {
     // Don't add more fields. Eq, Hash, and Ord must be compatible with the
     // borrowed RepoPath type.

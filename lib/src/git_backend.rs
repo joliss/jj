@@ -57,6 +57,8 @@ use crate::backend::CommitId;
 use crate::backend::Conflict;
 use crate::backend::ConflictId;
 use crate::backend::ConflictTerm;
+use crate::backend::CopyHistory;
+use crate::backend::CopyId;
 use crate::backend::CopyRecord;
 use crate::backend::FileId;
 use crate::backend::MergedTreeId;
@@ -1305,6 +1307,14 @@ impl Backend for GitBackend {
         mut_table.add_entry(id.to_bytes(), extras);
         self.save_extra_metadata_table(mut_table, &table_lock)?;
         Ok((id, contents))
+    }
+
+    fn read_copy(&self, _id: &CopyId) -> BackendResult<CopyHistory> {
+        unimplemented!();
+    }
+
+    fn write_copy(&self, _contents: &CopyHistory) -> BackendResult<CopyId> {
+        unimplemented!();
     }
 
     fn get_copy_records(

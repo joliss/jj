@@ -50,6 +50,7 @@ id_type!(pub TreeId { hex() });
 id_type!(pub FileId { hex() });
 id_type!(pub SymlinkId { hex() });
 id_type!(pub ConflictId { hex() });
+id_type!(pub CopyId { hex() });
 
 impl ChangeId {
     /// Returns the hex string representation of this ID, which uses `z-k`
@@ -193,6 +194,24 @@ pub struct CopyRecord {
     pub source_commit: CommitId,
 }
 
+/// Describes the copy history of a file. The copy object is unchanged when a
+/// file is modifed.
+#[derive(ContentHash, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
+pub struct CopyHistory {
+    /// The file's current path.
+    pub current_path: RepoPathBuf,
+    /// IDs of the files that became the current incarnation of this file.
+    ///
+    /// A newly created file has no parents. A regular copy or rename has one
+    /// parent. A merge of multiple files has multiple parents.
+    pub parents: Vec<CopyId>,
+    /// An optional piece of data to give the Copy object a different ID. May be
+    /// randomly generated. This allows a commit to say that a file was replaced
+    /// by a new incarnation of it, indicating a logically distinct file
+    /// taking the place of the previous file at the path.
+    pub salt: Vec<u8>,
+}
+
 /// Error that may occur during backend initialization.
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -266,6 +285,8 @@ pub type BackendResult<T> = Result<T, BackendError>;
 
 #[derive(ContentHash, Debug, PartialEq, Eq, Clone, Hash)]
 pub enum TreeValue {
+    // TODO: When there's a CopyId here, the copy object's path must match
+    // the path identified by the tree.
     File { id: FileId, executable: bool },
     Symlink(SymlinkId),
     Tree(TreeId),
@@ -463,6 +484,12 @@ pub trait Backend: Send + Sync + Debug {
         contents: Commit,
         sign_with: Option<&mut SigningFn>,
     ) -> BackendResult<(CommitId, Commit)>;
+
+    /// Read the specified `CopyHistory` object.
+    fn read_copy(&self, id: &CopyId) -> BackendResult<CopyHistory>;
+
+    /// Write the `CopyHistory` object and return its ID.
+    fn write_copy(&self, copy: &CopyHistory) -> BackendResult<CopyId>;
 
     /// Get copy records for the dag range `root..head`.  If `paths` is None
     /// include all paths, otherwise restrict to only `paths`.

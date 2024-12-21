@@ -38,6 +38,8 @@ use jj_lib::backend::Commit;
 use jj_lib::backend::CommitId;
 use jj_lib::backend::Conflict;
 use jj_lib::backend::ConflictId;
+use jj_lib::backend::CopyHistory;
+use jj_lib::backend::CopyId;
 use jj_lib::backend::CopyRecord;
 use jj_lib::backend::FileId;
 use jj_lib::backend::SecureSig;
@@ -66,6 +68,7 @@ pub struct TestBackendData {
     files: HashMap<RepoPathBuf, HashMap<FileId, Vec<u8>>>,
     symlinks: HashMap<RepoPathBuf, HashMap<SymlinkId, String>>,
     conflicts: HashMap<RepoPathBuf, HashMap<ConflictId, Conflict>>,
+    copies: HashMap<CopyId, CopyHistory>,
 }
 
 #[derive(Clone, Default)]
@@ -335,6 +338,25 @@ impl Backend for TestBackend {
             .commits
             .insert(id.clone(), contents.clone());
         Ok((id, contents))
+    }
+
+    fn read_copy(&self, id: &CopyId) -> BackendResult<CopyHistory> {
+        let copy = self.locked_data().copies.get(id).cloned().ok_or_else(|| {
+            BackendError::ObjectNotFound {
+                object_type: "copy".to_string(),
+                hash: id.hex(),
+                source: "".into(),
+            }
+        })?;
+        Ok(copy)
+    }
+
+    fn write_copy(&self, contents: &CopyHistory) -> BackendResult<CopyId> {
+        let id = CopyId::new(get_hash(contents));
+        self.locked_data()
+            .copies
+            .insert(id.clone(), contents.clone());
+        Ok(id)
     }
 
     fn get_copy_records(

@@ -43,6 +43,8 @@ use crate::backend::CommitId;
 use crate::backend::Conflict;
 use crate::backend::ConflictId;
 use crate::backend::ConflictTerm;
+use crate::backend::CopyHistory;
+use crate::backend::CopyId;
 use crate::backend::CopyRecord;
 use crate::backend::FileId;
 use crate::backend::MergedTreeId;
@@ -336,6 +338,14 @@ impl Backend for LocalBackend {
         persist_content_addressed_temp_file(temp_file, self.commit_path(&id))
             .map_err(to_other_err)?;
         Ok((id, commit))
+    }
+
+    fn read_copy(&self, _id: &CopyId) -> BackendResult<CopyHistory> {
+        unimplemented!();
+    }
+
+    fn write_copy(&self, _contents: &CopyHistory) -> BackendResult<CopyId> {
+        unimplemented!();
     }
 
     fn get_copy_records(
