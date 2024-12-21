@@ -23,6 +23,7 @@ use std::sync::Arc;
 use assert_matches::assert_matches;
 use indoc::indoc;
 use itertools::Itertools;
+use jj_lib::backend::CopyId;
 use jj_lib::backend::MergedTreeId;
 use jj_lib::backend::TreeId;
 use jj_lib::backend::TreeValue;
@@ -156,6 +157,7 @@ fn test_checkout_file_transitions(backend: TestRepoBackend) {
         path: &RepoPath,
     ) {
         let store = repo.store();
+        let copy_id = CopyId::new(vec![]);
         let value = match kind {
             Kind::Missing => Merge::absent(),
             Kind::Normal => {
@@ -163,6 +165,7 @@ fn test_checkout_file_transitions(backend: TestRepoBackend) {
                 Merge::normal(TreeValue::File {
                     id,
                     executable: false,
+                    copy_id,
                 })
             }
             Kind::Executable => {
@@ -171,6 +174,7 @@ fn test_checkout_file_transitions(backend: TestRepoBackend) {
                 Merge::normal(TreeValue::File {
                     id,
                     executable: true,
+                    copy_id,
                 })
             }
             Kind::ExecutableNormalContent => {
@@ -178,6 +182,7 @@ fn test_checkout_file_transitions(backend: TestRepoBackend) {
                 Merge::normal(TreeValue::File {
                     id,
                     executable: true,
+                    copy_id,
                 })
             }
             Kind::Conflict => {
@@ -188,15 +193,18 @@ fn test_checkout_file_transitions(backend: TestRepoBackend) {
                     vec![Some(TreeValue::File {
                         id: base_file_id,
                         executable: false,
+                        copy_id: copy_id.clone(),
                     })],
                     vec![
                         Some(TreeValue::File {
                             id: left_file_id,
                             executable: false,
+                            copy_id: copy_id.clone(),
                         }),
                         Some(TreeValue::File {
                             id: right_file_id,
                             executable: false,
+                            copy_id: copy_id.clone(),
                         }),
                     ],
                 )
@@ -211,15 +219,18 @@ fn test_checkout_file_transitions(backend: TestRepoBackend) {
                     vec![Some(TreeValue::File {
                         id: base_file_id,
                         executable: true,
+                        copy_id: copy_id.clone(),
                     })],
                     vec![
                         Some(TreeValue::File {
                             id: left_file_id,
                             executable: true,
+                            copy_id: copy_id.clone(),
                         }),
                         Some(TreeValue::File {
                             id: right_file_id,
                             executable: true,
+                            copy_id: copy_id.clone(),
                         }),
                     ],
                 )
@@ -234,6 +245,7 @@ fn test_checkout_file_transitions(backend: TestRepoBackend) {
                 let value = TreeValue::File {
                     id,
                     executable: false,
+                    copy_id: copy_id.clone(),
                 };
                 tree_builder.set_or_remove(file_path, Merge::normal(value));
                 return;
@@ -1356,6 +1368,7 @@ fn test_git_submodule(gitignore_content: &str) {
         Merge::normal(TreeValue::File {
             id: testutils::write_file(repo.store(), added_path, "added\n"),
             executable: false,
+            copy_id: CopyId::new(vec![]),
         }),
     );
 
@@ -2103,7 +2116,7 @@ fn test_fsmonitor() {
         let mut locked_ws = ws.start_working_copy_mutation().unwrap();
         let tree_id = snapshot(&mut locked_ws, &[foo_path]);
         insta::assert_snapshot!(testutils::dump_tree(repo.store(), &tree_id), @r###"
-        tree d5e38c0a1b0ee5de47c5
+        tree 2a5341b103917cfdb48a
           file "foo" (e99c2057c15160add351): "foo\n"
         "###);
     }
@@ -2115,7 +2128,7 @@ fn test_fsmonitor() {
             &[foo_path, bar_path, nested_path, ignored_path],
         );
         insta::assert_snapshot!(testutils::dump_tree(repo.store(), &tree_id), @r###"
-        tree f408c8d080414f8e90e1
+        tree 1c5c336421714b1df7bb
           file "bar" (94cc973e7e1aefb7eff6): "bar\n"
           file "foo" (e99c2057c15160add351): "foo\n"
           file "path/to/nested" (6209060941cd770c8d46): "nested\n"
@@ -2129,7 +2142,7 @@ fn test_fsmonitor() {
         let mut locked_ws = ws.start_working_copy_mutation().unwrap();
         let tree_id = snapshot(&mut locked_ws, &[foo_path]);
         insta::assert_snapshot!(testutils::dump_tree(repo.store(), &tree_id), @r###"
-        tree e994a93c46f41dc91704
+        tree f653dfa18d0b025bdb9e
           file "bar" (94cc973e7e1aefb7eff6): "bar\n"
           file "foo" (e0fbd106147cc04ccd05): "updated foo\n"
           file "path/to/nested" (6209060941cd770c8d46): "nested\n"
@@ -2141,7 +2154,7 @@ fn test_fsmonitor() {
         let mut locked_ws = ws.start_working_copy_mutation().unwrap();
         let tree_id = snapshot(&mut locked_ws, &[foo_path]);
         insta::assert_snapshot!(testutils::dump_tree(repo.store(), &tree_id), @r###"
-        tree 1df764981d4d74a4ecfa
+        tree b7416fc248a038b920c3
           file "bar" (94cc973e7e1aefb7eff6): "bar\n"
           file "path/to/nested" (6209060941cd770c8d46): "nested\n"
         "###);

@@ -185,6 +185,7 @@ fn run_mergetool_external_single_file(
         repo_path,
         conflict,
         file_merge,
+        copy_id,
         content,
     } = merge_tool_file;
 
@@ -313,6 +314,7 @@ fn run_mergetool_external_single_file(
                 .and_then(Merge::resolve_trivial)
                 .copied()
                 .unwrap_or_default(),
+            copy_id: copy_id.clone(),
         }),
         Err(new_file_ids) => conflict.with_new_file_ids(&new_file_ids),
     };

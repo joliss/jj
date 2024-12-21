@@ -30,6 +30,7 @@ use crate::annotate::get_annotation_with_file_content;
 use crate::backend::BackendError;
 use crate::backend::BackendResult;
 use crate::backend::CommitId;
+use crate::backend::CopyId;
 use crate::backend::FileId;
 use crate::backend::TreeValue;
 use crate::commit::Commit;
@@ -108,8 +109,8 @@ pub async fn split_hunks_to_trees(
         let left_path = entry.path.source();
         let right_path = entry.path.target();
         let (left_value, right_value) = entry.values?;
-        let (left_text, executable) = match to_file_value(left_value) {
-            Ok(Some(mut value)) => (value.read(left_path)?, value.executable),
+        let (left_text, executable, copy_id) = match to_file_value(left_value) {
+            Ok(Some(mut value)) => (value.read(left_path)?, value.executable, value.copy_id),
             // New file should have no destinations
             Ok(None) => continue,
             Err(reason) => {
@@ -165,7 +166,11 @@ pub async fn split_hunks_to_trees(
                 .await?;
             tree_builder.set_or_remove(
                 left_path.to_owned(),
-                Merge::normal(TreeValue::File { id, executable }),
+                Merge::normal(TreeValue::File {
+                    id,
+                    executable,
+                    copy_id: copy_id.clone(),
+                }),
             );
         }
     }
@@ -337,6 +342,7 @@ pub fn absorb_hunks(
 struct FileValue {
     id: FileId,
     executable: bool,
+    copy_id: CopyId,
     reader: Box<dyn Read>,
 }
 
@@ -361,10 +367,12 @@ fn to_file_value(value: MaterializedTreeValue) -> Result<Option<FileValue>, Stri
         MaterializedTreeValue::File {
             id,
             executable,
+            copy_id,
             reader,
         } => Ok(Some(FileValue {
             id,
             executable,
+            copy_id,
             reader,
         })),
         MaterializedTreeValue::Symlink { .. } => Err("Is a symlink".into()),

@@ -787,13 +787,13 @@ fn test_workspaces_current_op_discarded_by_other(automatic: bool) {
     );
     insta::allow_duplicates! {
         insta::assert_snapshot!(stdout, @r"
-        @  757bc1140b abandon commit 20dd439c4bd12c6ad56c187ac490bd0141804618f638dc5c4dc92ff9aecba20f152b23160db9dcf61beb31a5cb14091d9def5a36d11c9599cc4d2e5689236af1
-        ○  8d4abed655 create initial working-copy commit in workspace secondary
-        ○  3de27432e5 add workspace 'secondary'
-        ○  bcf69de808 new empty commit
-        ○  a36b99a15c snapshot working copy
-        ○  ddf023d319 new empty commit
-        ○  829c93f6a3 snapshot working copy
+        @  268afb85fd abandon commit e68c5665923fda8989341df5bfdc9e76b6040c4905352f8d27d37a9961f26246dd2361dd7b32452e09865a756333fb9a945cc3c971c943727c3f790403d93b5c
+        ○  1bf76fcd20 create initial working-copy commit in workspace secondary
+        ○  d64e312f46 add workspace 'secondary'
+        ○  a662e2afcd new empty commit
+        ○  f98311a6e1 snapshot working copy
+        ○  72bd82d233 new empty commit
+        ○  64570192fa snapshot working copy
         ○  2557266dd2 add workspace 'default'
         ○  0000000000
         [EOF]
@@ -806,10 +806,10 @@ fn test_workspaces_current_op_discarded_by_other(automatic: bool) {
 
     insta::allow_duplicates! {
         insta::assert_snapshot!(get_log_output(&test_env, &main_path), @r"
-        @  6c051bd1ccd5 default@
-        │ ○  96b31dafdc41 secondary@
+        @  11edab5b266a default@
+        │ ○  bb270bb3da1a secondary@
         ├─╯
-        ○  7c5b25a4fc8f
+        ○  f11c8a37d6b1
         ◆  000000000000
         [EOF]
         ");
@@ -825,13 +825,13 @@ fn test_workspaces_current_op_discarded_by_other(automatic: bool) {
         A added
         D deleted
         M modified
-        Working copy : kmkuslsw 15df8cb5 RECOVERY COMMIT FROM `jj workspace update-stale`
-        Parent commit: rzvqmyuk 96b31daf (empty) (no description set)
+        Working copy : kmkuslsw 49aded34 RECOVERY COMMIT FROM `jj workspace update-stale`
+        Parent commit: rzvqmyuk bb270bb3 (empty) (no description set)
         [EOF]
         ");
         insta::assert_snapshot!(stderr, @r"
-        Failed to read working copy's current operation; attempting recovery. Error message from read attempt: Object 8d4abed655badb70b1bab62aa87136619dbc3c8015a8ce8dfb7abfeca4e2f36c713d8f84e070a0613907a6cee7e1cc05323fe1205a319b93fe978f11a060c33c of type operation not found
-        Created and checked out recovery commit 76d0126b3e5c
+        Failed to read working copy's current operation; attempting recovery. Error message from read attempt: Object 1bf76fcd20a060de792e46ed31550a640f650d6bf76725bea7baa7310d5a61e68cf4700de99f79d309bf841b3671df9220f4aba92005429903af78f83b091174 of type operation not found
+        Created and checked out recovery commit bb1cb39b82c1
         [EOF]
         ");
     } else {
@@ -845,8 +845,8 @@ fn test_workspaces_current_op_discarded_by_other(automatic: bool) {
 
         let (stdout, stderr) = test_env.jj_cmd_ok(&secondary_path, &["workspace", "update-stale"]);
         insta::assert_snapshot!(stderr, @r"
-        Failed to read working copy's current operation; attempting recovery. Error message from read attempt: Object 8d4abed655badb70b1bab62aa87136619dbc3c8015a8ce8dfb7abfeca4e2f36c713d8f84e070a0613907a6cee7e1cc05323fe1205a319b93fe978f11a060c33c of type operation not found
-        Created and checked out recovery commit 76d0126b3e5c
+        Failed to read working copy's current operation; attempting recovery. Error message from read attempt: Object 1bf76fcd20a060de792e46ed31550a640f650d6bf76725bea7baa7310d5a61e68cf4700de99f79d309bf841b3671df9220f4aba92005429903af78f83b091174 of type operation not found
+        Created and checked out recovery commit bb1cb39b82c1
         [EOF]
         ");
         insta::assert_snapshot!(stdout, @"");
@@ -854,11 +854,11 @@ fn test_workspaces_current_op_discarded_by_other(automatic: bool) {
 
     insta::allow_duplicates! {
         insta::assert_snapshot!(get_log_output(&test_env, &main_path), @r"
-        @  6c051bd1ccd5 default@
-        │ ○  15df8cb57d3f secondary@
-        │ ○  96b31dafdc41
+        @  11edab5b266a default@
+        │ ○  49aded3437d8 secondary@
+        │ ○  bb270bb3da1a
         ├─╯
-        ○  7c5b25a4fc8f
+        ○  f11c8a37d6b1
         ◆  000000000000
         [EOF]
         ");
@@ -884,8 +884,8 @@ fn test_workspaces_current_op_discarded_by_other(automatic: bool) {
         A added
         D deleted
         M modified
-        Working copy : kmkuslsw 15df8cb5 RECOVERY COMMIT FROM `jj workspace update-stale`
-        Parent commit: rzvqmyuk 96b31daf (empty) (no description set)
+        Working copy : kmkuslsw 49aded34 RECOVERY COMMIT FROM `jj workspace update-stale`
+        Parent commit: rzvqmyuk bb270bb3 (empty) (no description set)
         [EOF]
         ");
     }
@@ -903,9 +903,9 @@ fn test_workspaces_current_op_discarded_by_other(automatic: bool) {
     }
     insta::allow_duplicates! {
         insta::assert_snapshot!(stdout, @r"
-        @  kmkuslsw test.user@example.com 2001-02-03 08:05:18 secondary@ 15df8cb5
+        @  kmkuslsw test.user@example.com 2001-02-03 08:05:18 secondary@ 49aded34
         │  RECOVERY COMMIT FROM `jj workspace update-stale`
-        ○  kmkuslsw hidden test.user@example.com 2001-02-03 08:05:18 76d0126b
+        ○  kmkuslsw hidden test.user@example.com 2001-02-03 08:05:18 bb1cb39b
            (empty) RECOVERY COMMIT FROM `jj workspace update-stale`
         [EOF]
         ");

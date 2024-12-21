@@ -31,6 +31,7 @@ use smallvec::SmallVec;
 
 use crate::backend;
 use crate::backend::BackendResult;
+use crate::backend::CopyId;
 use crate::backend::FileId;
 use crate::backend::TreeId;
 use crate::backend::TreeValue;
@@ -558,16 +559,39 @@ where
             })
     }
 
-    /// If this merge contains only files or absent entries, returns a merge of
-    /// the `FileId`s`. The executable bits will be ignored. Use
-    /// `Merge::with_new_file_ids()` to produce a new merge with the original
-    /// executable bits preserved.
-    pub fn to_file_merge(&self) -> Option<Merge<Option<FileId>>> {
-        self.maybe_map(|term| match borrow_tree_value(term.as_ref()) {
+    /// If this merge contains only files or absent entries, and they all have
+    /// the same copy ID, returns a merge of the `FileId`s`. The executable
+    /// bits will be ignored. Use `Merge::with_new_file_ids()` to produce a
+    /// new merge with the original executable bits preserved.
+    pub fn to_file_merge(&self) -> Option<(Merge<Option<FileId>>, CopyId)> {
+        let copy_ids = self
+            .iter()
+            .filter_map(|term| match borrow_tree_value(term.as_ref()) {
+                Some(TreeValue::File {
+                    id: _,
+                    executable: _,
+                    copy_id,
+                }) => Some(copy_id),
+                _ => None,
+            })
+            .collect_vec();
+        if !copy_ids.iter().all_equal() {
+            return None;
+        }
+        let copy_id = copy_ids.into_iter().next().unwrap();
+
+        let file_ids = self.maybe_map(|term| match borrow_tree_value(term.as_ref()) {
             None => Some(None),
-            Some(TreeValue::File { id, executable: _ }) => Some(Some(id.clone())),
+            Some(TreeValue::File {
+                id,
+                executable: _,
+                copy_id: _,
+            }) => Some(Some(id.clone())),
             _ => None,
-        })
+        })?;
+
+        Some((file_ids, copy_id.clone()))
+        
     }
 
     /// If this merge contains only files or absent entries, returns a merge of
@@ -575,7 +599,24 @@ where
     pub fn to_executable_merge(&self) -> Option<Merge<bool>> {
         self.maybe_map(|term| match borrow_tree_value(term.as_ref()) {
             None => Some(false),
-            Some(TreeValue::File { id: _, executable }) => Some(*executable),
+            Some(TreeValue::File {
+                id: _,
+                executable,
+                copy_id: _,
+            }) => Some(*executable),
+            _ => None,
+        })
+    }
+
+    /// If this merge contains only files or absent entries, returns a merge of
+    /// the files' copy IDs.
+    pub fn to_copy_id_merge(&self) -> Option<Merge<CopyId>> {
+        self.maybe_map(|term| match borrow_tree_value(term.as_ref()) {
+            Some(TreeValue::File {
+                id: _,
+                executable: _,
+                copy_id,
+            }) => Some(copy_id.clone()),
             _ => None,
         })
     }
@@ -614,12 +655,16 @@ where
         assert_eq!(self.values.len(), file_ids.values.len());
         let values = zip(self.iter(), file_ids.iter())
             .map(|(tree_value, file_id)| {
-                if let Some(TreeValue::File { id: _, executable }) =
-                    borrow_tree_value(tree_value.as_ref())
+                if let Some(TreeValue::File {
+                    id: _,
+                    executable,
+                    copy_id,
+                }) = borrow_tree_value(tree_value.as_ref())
                 {
                     Some(TreeValue::File {
                         id: file_id.as_ref().unwrap().clone(),
                         executable: *executable,
+                        copy_id: copy_id.clone(),
                     })
                 } else {
                     assert!(tree_value.is_none());
@@ -654,14 +699,16 @@ fn describe_conflict_term(value: &TreeValue) -> String {
         TreeValue::File {
             id,
             executable: false,
+            copy_id,
         } => {
-            format!("file with id {id}")
+            format!("file with id {id} and copy id {copy_id}")
         }
         TreeValue::File {
             id,
             executable: true,
+            copy_id,
         } => {
-            format!("executable file with id {id}")
+            format!("executable file with id {id} and copy id {copy_id}")
         }
         TreeValue::Symlink(id) => {
             format!("symlink with id {id}")

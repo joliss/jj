@@ -58,6 +58,7 @@ use tracing::trace_span;
 
 use crate::backend::BackendError;
 use crate::backend::BackendResult;
+use crate::backend::CopyId;
 use crate::backend::FileId;
 use crate::backend::MergedTreeId;
 use crate::backend::MillisSinceEpoch;
@@ -1487,8 +1488,26 @@ impl FileSnapshotter<'_> {
                     false
                 }
             };
-            Ok(Merge::normal(TreeValue::File { id, executable }))
-        } else if let Some(old_file_ids) = current_tree_values.to_file_merge() {
+            // Preserve the copy id from the current tree
+            let copy_id = {
+                if let Some(TreeValue::File {
+                    id: _,
+                    executable: _,
+                    copy_id,
+                }) = current_tree_value
+                {
+                    copy_id.clone()
+                } else {
+                    CopyId::new(vec![]) // TODO: Create a new copy ID for this
+                                        // file
+                }
+            };
+            Ok(Merge::normal(TreeValue::File {
+                id,
+                executable,
+                copy_id,
+            }))
+        } else if let Some((old_file_ids, copy_id)) = current_tree_values.to_file_merge() {
             // If the file contained a conflict before and is a normal file on
             // disk, we try to parse any conflict markers in the file into a
             // conflict.
@@ -1522,6 +1541,7 @@ impl FileSnapshotter<'_> {
                     Ok(Merge::normal(TreeValue::File {
                         id: file_id.unwrap(),
                         executable,
+                        copy_id,
                     }))
                 }
                 Err(new_file_ids) => {
@@ -1847,6 +1867,7 @@ impl TreeState {
                     id: _,
                     contents,
                     executable,
+                    copy_id: _,
                 } => {
                     let conflict_marker_len = choose_materialized_conflict_marker_len(&contents);
                     let data = materialize_merge_result_to_bytes_with_marker_len(
@@ -1900,7 +1921,11 @@ impl TreeState {
                 let file_type = match after.into_resolved() {
                     Ok(value) => match value.unwrap() {
                         #[cfg(unix)]
-                        TreeValue::File { id: _, executable } => FileType::Normal { executable },
+                        TreeValue::File {
+                            id: _,
+                            executable,
+                            copy_id: _,
+                        } => FileType::Normal { executable },
                         #[cfg(windows)]
                         TreeValue::File { .. } => FileType::Normal { executable: () },
                         TreeValue::Symlink(_id) => FileType::Symlink,

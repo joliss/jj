@@ -15,6 +15,7 @@
 use futures::StreamExt;
 use itertools::Itertools;
 use jj_lib::backend::CommitId;
+use jj_lib::backend::CopyId;
 use jj_lib::backend::CopyRecord;
 use jj_lib::backend::FileId;
 use jj_lib::backend::MergedTreeId;
@@ -49,6 +50,7 @@ fn file_value(file_id: &FileId) -> TreeValue {
     TreeValue::File {
         id: file_id.clone(),
         executable: false,
+        copy_id: CopyId::new(vec![]),
     }
 }
 
@@ -181,6 +183,7 @@ fn test_from_legacy_tree() {
         Merge::normal(TreeValue::File {
             id: file1_id.clone(),
             executable: false,
+            copy_id: CopyId::new(vec![]),
         })
     );
     // file2: 3-way conflict

@@ -14,6 +14,8 @@ pub mod tree_value {
         pub id: ::prost::alloc::vec::Vec<u8>,
         #[prost(bool, tag = "2")]
         pub executable: bool,
+        #[prost(bytes = "vec", tag = "3")]
+        pub copy_id: ::prost::alloc::vec::Vec<u8>,
     }
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]

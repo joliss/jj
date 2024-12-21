@@ -909,6 +909,7 @@ fn diff_content(
             id: _,
             contents,
             executable: _,
+            copy_id: _,
         } => Ok(FileContent {
             is_binary: false,
             contents: materialize_merge_result_to_bytes(&contents, conflict_marker_style).into(),
@@ -1196,6 +1197,7 @@ fn git_diff_part(
         MaterializedTreeValue::File {
             id,
             executable,
+            copy_id: _,
             mut reader,
         } => {
             mode = if executable { "100755" } else { "100644" };
@@ -1221,6 +1223,7 @@ fn git_diff_part(
             id: _,
             contents,
             executable,
+            copy_id: _,
         } => {
             mode = if executable { "100755" } else { "100644" };
             hash = DUMMY_HASH.to_owned();

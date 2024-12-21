@@ -32,6 +32,7 @@ use pollster::FutureExt;
 use crate::backend::BackendError;
 use crate::backend::BackendResult;
 use crate::backend::CommitId;
+use crate::backend::CopyId;
 use crate::backend::FileId;
 use crate::backend::SymlinkId;
 use crate::backend::TreeId;
@@ -137,6 +138,7 @@ pub enum MaterializedTreeValue {
     File {
         id: FileId,
         executable: bool,
+        copy_id: CopyId,
         reader: Box<dyn Read>,
     },
     Symlink {
@@ -149,6 +151,7 @@ pub enum MaterializedTreeValue {
         // when null bytes found?
         contents: Merge<BString>,
         executable: bool,
+        copy_id: CopyId,
     },
     OtherConflict {
         id: MergedTreeValue,
@@ -189,11 +192,16 @@ async fn materialize_tree_value_no_access_denied(
 ) -> BackendResult<MaterializedTreeValue> {
     match value.into_resolved() {
         Ok(None) => Ok(MaterializedTreeValue::Absent),
-        Ok(Some(TreeValue::File { id, executable })) => {
+        Ok(Some(TreeValue::File {
+            id,
+            executable,
+            copy_id,
+        })) => {
             let reader = store.read_file_async(path, &id).await?;
             Ok(MaterializedTreeValue::File {
                 id,
                 executable,
+                copy_id,
                 reader,
             })
         }
@@ -207,7 +215,7 @@ async fn materialize_tree_value_no_access_denied(
             panic!("cannot materialize legacy conflict object at path {path:?}");
         }
         Err(conflict) => {
-            let Some(file_merge) = conflict.to_file_merge() else {
+            let Some((file_merge, copy_id)) = conflict.to_file_merge() else {
                 return Ok(MaterializedTreeValue::OtherConflict { id: conflict });
             };
             let file_merge = file_merge.simplify();
@@ -221,6 +229,7 @@ async fn materialize_tree_value_no_access_denied(
                 id: file_merge,
                 contents,
                 executable,
+                copy_id,
             })
         }
     }

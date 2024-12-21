@@ -287,7 +287,11 @@ pub type BackendResult<T> = Result<T, BackendError>;
 pub enum TreeValue {
     // TODO: When there's a CopyId here, the copy object's path must match
     // the path identified by the tree.
-    File { id: FileId, executable: bool },
+    File {
+        id: FileId,
+        executable: bool,
+        copy_id: CopyId,
+    },
     Symlink(SymlinkId),
     Tree(TreeId),
     GitSubmodule(CommitId),

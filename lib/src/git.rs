@@ -1192,7 +1192,7 @@ fn build_index_from_merged_tree(
             };
 
             let (id, mode) = match entry {
-                TreeValue::File { id, executable } => {
+                TreeValue::File { id, executable, copy_id: _ } => {
                     if *executable {
                         (id.as_bytes(), gix::index::entry::Mode::FILE_EXECUTABLE)
                     } else {

@@ -20,6 +20,7 @@ use std::sync::Arc;
 
 use bstr::BString;
 use itertools::Itertools;
+use jj_lib::backend::CopyId;
 use jj_lib::backend::FileId;
 use jj_lib::backend::MergedTreeId;
 use jj_lib::config::ConfigGetError;
@@ -284,6 +285,7 @@ struct MergeToolFile {
     repo_path: RepoPathBuf,
     conflict: MergedTreeValue,
     file_merge: Merge<Option<FileId>>,
+    copy_id: CopyId,
     content: Merge<BString>,
 }
 
@@ -297,7 +299,7 @@ impl MergeToolFile {
             Ok(Some(_)) => return Err(ConflictResolveError::NotAConflict(repo_path.to_owned())),
             Ok(None) => return Err(ConflictResolveError::PathNotFound(repo_path.to_owned())),
         };
-        let file_merge = conflict.to_file_merge().ok_or_else(|| {
+        let (file_merge, copy_id) = conflict.to_file_merge().ok_or_else(|| {
             let summary = conflict.describe();
             ConflictResolveError::NotNormalFiles(repo_path.to_owned(), summary)
         })?;
@@ -315,6 +317,7 @@ impl MergeToolFile {
             repo_path: repo_path.to_owned(),
             conflict,
             file_merge,
+            copy_id,
             content,
         })
     }

@@ -426,13 +426,31 @@ pub async fn try_resolve_file_conflict(
     // we can't merge them anyway. At the same time we determine whether the
     // resulting file should be executable.
     let Some(file_id_conflict) = conflict.maybe_map(|term| match term {
-        Some(TreeValue::File { id, executable: _ }) => Some(id),
+        Some(TreeValue::File {
+            id,
+            executable: _,
+            copy_id: _,
+        }) => Some(id),
         _ => None,
     }) else {
         return Ok(None);
     };
     let Some(executable_conflict) = conflict.maybe_map(|term| match term {
-        Some(TreeValue::File { id: _, executable }) => Some(executable),
+        Some(TreeValue::File {
+            id: _,
+            executable,
+            copy_id: _,
+        }) => Some(executable),
+        _ => None,
+    }) else {
+        return Ok(None);
+    };
+    let Some(copy_id_conflict) = conflict.maybe_map(|term| match term {
+        Some(TreeValue::File {
+            id: _,
+            executable: _,
+            copy_id,
+        }) => Some(copy_id),
         _ => None,
     }) else {
         return Ok(None);
@@ -441,12 +459,17 @@ pub async fn try_resolve_file_conflict(
         // We're unable to determine whether the result should be executable
         return Ok(None);
     };
+    let Some(&copy_id) = copy_id_conflict.resolve_trivial() else {
+        // We're unable to determine the file's copy ID
+        return Ok(None);
+    };
     if let Some(&resolved_file_id) = file_id_conflict.resolve_trivial() {
         // Don't bother reading the file contents if the conflict can be trivially
         // resolved.
         return Ok(Some(TreeValue::File {
             id: resolved_file_id.clone(),
             executable,
+            copy_id: copy_id.clone(),
         }));
     }
 
@@ -477,7 +500,11 @@ pub async fn try_resolve_file_conflict(
             let id = store
                 .write_file(filename, &mut merged_content.as_slice())
                 .await?;
-            Ok(Some(TreeValue::File { id, executable }))
+            Ok(Some(TreeValue::File {
+                id,
+                executable,
+                copy_id: copy_id.clone(),
+            }))
         }
         MergeResult::Conflict(_) => Ok(None),
     }

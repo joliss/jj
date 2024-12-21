@@ -1028,6 +1028,7 @@ impl Backend for GitBackend {
                             TreeValue::File {
                                 id,
                                 executable: false,
+                                copy_id: CopyId::new(vec![]), // TODO: return a real value
                             },
                         )
                     }
@@ -1039,6 +1040,7 @@ impl Backend for GitBackend {
                         TreeValue::File {
                             id,
                             executable: true,
+                            copy_id: CopyId::new(vec![]), // TODO: return a real value
                         },
                     )
                 }
@@ -1067,6 +1069,7 @@ impl Backend for GitBackend {
                     TreeValue::File {
                         id,
                         executable: false,
+                        copy_id: _, // TODO: Use the value
                     } => gix::objs::tree::Entry {
                         mode: gix::object::tree::EntryKind::Blob.into(),
                         filename: name.into(),
@@ -1075,6 +1078,7 @@ impl Backend for GitBackend {
                     TreeValue::File {
                         id,
                         executable: true,
+                        copy_id: _, // TODO: Use the value
                     } => gix::objs::tree::Entry {
                         mode: gix::object::tree::EntryKind::BlobExecutable.into(),
                         filename: name.into(),
@@ -1494,7 +1498,11 @@ fn conflict_term_from_json(json: &serde_json::Value) -> ConflictTerm {
 
 fn tree_value_to_json(value: &TreeValue) -> serde_json::Value {
     match value {
-        TreeValue::File { id, executable } => serde_json::json!({
+        TreeValue::File {
+            id,
+            executable,
+            copy_id: _,
+        } => serde_json::json!({
              "file": {
                  "id": id.hex(),
                  "executable": executable,
@@ -1520,6 +1528,7 @@ fn tree_value_from_json(json: &serde_json::Value) -> TreeValue {
         TreeValue::File {
             id: FileId::new(bytes_vec_from_json(json_file.get("id").unwrap())),
             executable: json_file.get("executable").unwrap().as_bool().unwrap(),
+            copy_id: CopyId::new(vec![]), // TODO: return a real value
         }
     } else if let Some(json_id) = json.get("symlink_id") {
         TreeValue::Symlink(SymlinkId::new(bytes_vec_from_json(json_id)))
@@ -1691,7 +1700,8 @@ mod tests {
             file.value(),
             &TreeValue::File {
                 id: FileId::from_bytes(blob1.as_bytes()),
-                executable: false
+                executable: false,
+                copy_id: CopyId::new(vec![]),
             }
         );
         assert_eq!(symlink.name().as_internal_str(), "symlink");

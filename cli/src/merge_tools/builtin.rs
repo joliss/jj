@@ -161,6 +161,7 @@ fn read_file_contents(
         MaterializedTreeValue::File {
             id,
             executable,
+            copy_id: _,
             mut reader,
         } => {
             let mut buf = Vec::new();
@@ -207,6 +208,7 @@ fn read_file_contents(
         MaterializedTreeValue::FileConflict {
             id: _,
             contents,
+            copy_id: _,
             executable: _,
         } => {
             let buf = materialize_merge_result_to_bytes(&contents, conflict_marker_style).into();
@@ -499,6 +501,15 @@ pub fn apply_diff_builtin(
                 tree_builder.set_or_remove(path, value);
             }
             scm_record::SelectedContents::Present { contents } => {
+                let value = right_tree.path_value(&path)?;
+                let Some(TreeValue::File {
+                    id: _,
+                    executable: _,
+                    copy_id,
+                }) = value.as_normal()
+                else {
+                    unreachable!("Should be editing a file diff");
+                };
                 let file_id = store
                     .write_file(&path, &mut contents.as_bytes())
                     .block_on()?;
@@ -508,6 +519,7 @@ pub fn apply_diff_builtin(
                         id: file_id,
                         executable: file.get_file_mode()
                             == Some(scm_record::FileMode(mode::EXECUTABLE)),
+                        copy_id: copy_id.clone(),
                     }),
                 );
             }
@@ -1082,7 +1094,11 @@ mod tests {
 
         fn to_file_id(tree_value: MergedTreeValue) -> Option<FileId> {
             match tree_value.into_resolved() {
-                Ok(Some(TreeValue::File { id, executable: _ })) => Some(id.clone()),
+                Ok(Some(TreeValue::File {
+                    id,
+                    executable: _,
+                    copy_id: _,
+                })) => Some(id.clone()),
                 other => {
                     panic!("merge should have been a FileId: {other:?}")
                 }

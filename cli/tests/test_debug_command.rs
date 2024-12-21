@@ -168,8 +168,8 @@ fn test_debug_tree() {
     // Defaults to showing the tree at the current commit
     let stdout = test_env.jj_cmd_success(&workspace_path, &["debug", "tree"]);
     assert_snapshot!(stdout.normalize_backslash(), @r#"
-    dir/subdir/file1: Ok(Resolved(Some(File { id: FileId("498e9b01d79cb8d31cdf0df1a663cc1fcefd9de3"), executable: false })))
-    dir/subdir/file2: Ok(Resolved(Some(File { id: FileId("b2496eaffe394cd50a9db4de5787f45f09fd9722"), executable: false })))
+    dir/subdir/file1: Ok(Resolved(Some(File { id: FileId("498e9b01d79cb8d31cdf0df1a663cc1fcefd9de3"), executable: false, copy_id: CopyId("") })))
+    dir/subdir/file2: Ok(Resolved(Some(File { id: FileId("b2496eaffe394cd50a9db4de5787f45f09fd9722"), executable: false, copy_id: CopyId("") })))
     [EOF]
     "#
     );
@@ -177,7 +177,7 @@ fn test_debug_tree() {
     // Can show the tree at another commit
     let stdout = test_env.jj_cmd_success(&workspace_path, &["debug", "tree", "-r@-"]);
     assert_snapshot!(stdout.normalize_backslash(), @r#"
-    dir/subdir/file1: Ok(Resolved(Some(File { id: FileId("498e9b01d79cb8d31cdf0df1a663cc1fcefd9de3"), executable: false })))
+    dir/subdir/file1: Ok(Resolved(Some(File { id: FileId("498e9b01d79cb8d31cdf0df1a663cc1fcefd9de3"), executable: false, copy_id: CopyId("") })))
     [EOF]
     "#
     );
@@ -185,7 +185,7 @@ fn test_debug_tree() {
     // Can filter by paths
     let stdout = test_env.jj_cmd_success(&workspace_path, &["debug", "tree", "dir/subdir/file2"]);
     assert_snapshot!(stdout.normalize_backslash(), @r#"
-    dir/subdir/file2: Ok(Resolved(Some(File { id: FileId("b2496eaffe394cd50a9db4de5787f45f09fd9722"), executable: false })))
+    dir/subdir/file2: Ok(Resolved(Some(File { id: FileId("b2496eaffe394cd50a9db4de5787f45f09fd9722"), executable: false, copy_id: CopyId("") })))
     [EOF]
     "#
     );
@@ -200,8 +200,8 @@ fn test_debug_tree() {
         ],
     );
     assert_snapshot!(stdout.normalize_backslash(), @r#"
-    dir/subdir/file1: Ok(Resolved(Some(File { id: FileId("498e9b01d79cb8d31cdf0df1a663cc1fcefd9de3"), executable: false })))
-    dir/subdir/file2: Ok(Resolved(Some(File { id: FileId("b2496eaffe394cd50a9db4de5787f45f09fd9722"), executable: false })))
+    dir/subdir/file1: Ok(Resolved(Some(File { id: FileId("498e9b01d79cb8d31cdf0df1a663cc1fcefd9de3"), executable: false, copy_id: CopyId("") })))
+    dir/subdir/file2: Ok(Resolved(Some(File { id: FileId("b2496eaffe394cd50a9db4de5787f45f09fd9722"), executable: false, copy_id: CopyId("") })))
     [EOF]
     "#
     );
@@ -217,8 +217,8 @@ fn test_debug_tree() {
         ],
     );
     assert_snapshot!(stdout.normalize_backslash(), @r#"
-    dir/subdir/file1: Ok(Resolved(Some(File { id: FileId("498e9b01d79cb8d31cdf0df1a663cc1fcefd9de3"), executable: false })))
-    dir/subdir/file2: Ok(Resolved(Some(File { id: FileId("b2496eaffe394cd50a9db4de5787f45f09fd9722"), executable: false })))
+    dir/subdir/file1: Ok(Resolved(Some(File { id: FileId("498e9b01d79cb8d31cdf0df1a663cc1fcefd9de3"), executable: false, copy_id: CopyId("") })))
+    dir/subdir/file2: Ok(Resolved(Some(File { id: FileId("b2496eaffe394cd50a9db4de5787f45f09fd9722"), executable: false, copy_id: CopyId("") })))
     [EOF]
     "#
     );
@@ -235,7 +235,7 @@ fn test_debug_tree() {
         ],
     );
     assert_snapshot!(stdout.normalize_backslash(), @r#"
-    dir/subdir/file2: Ok(Resolved(Some(File { id: FileId("b2496eaffe394cd50a9db4de5787f45f09fd9722"), executable: false })))
+    dir/subdir/file2: Ok(Resolved(Some(File { id: FileId("b2496eaffe394cd50a9db4de5787f45f09fd9722"), executable: false, copy_id: CopyId("") })))
     [EOF]
     "#
     );
