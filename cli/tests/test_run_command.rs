@@ -114,7 +114,7 @@ fn init_test_env() -> (TestEnvironment, PathBuf) {
 
 fn get_log_output(repo_path: &Path, test_env: &TestEnvironment) -> String {
     test_env.jj_cmd_success(
-        &repo_path,
+        repo_path,
         &["log", "-T", r#"change_id ++ description ++ "\n""#],
     )
 }

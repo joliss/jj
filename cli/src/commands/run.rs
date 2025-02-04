@@ -132,7 +132,7 @@ fn get_runtime(jobs: usize) -> tokio::runtime::Runtime {
 struct OnDiskCommit {
     /// Obfuscated name for an easier lookup. Not set for `StoredCommits` which
     /// have no longer have the original commits `TreeState` set.
-    name: Option<String>,
+    _name: Option<String>,
     /// The respective commit unmodified.
     commit: Commit,
     /// The output directory of the commit, contains stdout and stderr for it
@@ -140,7 +140,7 @@ struct OnDiskCommit {
     /// Self-explanatory
     working_copy_dir: PathBuf,
     /// Where the state is stored
-    state_dir: PathBuf,
+    _state_dir: PathBuf,
     /// The commits `TreeState`, which is loaded on creation and then replaced
     /// if necessary. Protected by a Mutex for crossthread compatibility.
     tree_state: Mutex<TreeState>,
@@ -156,12 +156,12 @@ impl OnDiskCommit {
         tree_state: Mutex<TreeState>,
     ) -> Self {
         Self {
-            name,
+            _name: name,
             commit: commit.clone(),
             output_dir,
             working_copy_dir,
             tree_state,
-            state_dir,
+            _state_dir: state_dir,
         }
     }
 }
@@ -259,8 +259,8 @@ struct RunJob {
 }
 
 // TODO: make this more revset/commit stream friendly.
-async fn run_inner<'a>(
-    tx: &WorkspaceCommandTransaction<'a>,
+async fn run_inner(
+    tx: &WorkspaceCommandTransaction<'_>,
     sender: Sender<RunJob>,
     handle: &tokio::runtime::Handle,
     shell_command: Arc<String>,
@@ -299,7 +299,7 @@ async fn run_inner<'a>(
 
 /// Rewrite a single `OnDiskCommit`. The caller is responsible for creating the
 /// final commit.
-async fn rewrite_commit<'a>(
+async fn rewrite_commit(
     base_ignores: Arc<GitIgnoreFile>,
     conflict_marker_style: ConflictMarkerStyle,
     stored_commit: Arc<OnDiskCommit>,
@@ -361,7 +361,7 @@ async fn rewrite_commit<'a>(
     let (dirty, _) = tree_state.snapshot(&options).unwrap();
     if !dirty {
         tracing::debug!(
-            "commit {} was not modified as the passed command did nothing",
+            "commit {} was not modified as the passed command did not modify any tracked files",
             commit.id()
         );
     }
@@ -404,7 +404,7 @@ pub struct RunArgs {
     shell_command: String,
     /// The revisions to change.
     #[arg(long, short, default_value = "@", value_name = "REVSETS")]
-    revisions: RevisionArg,
+    revisions: Vec<RevisionArg>,
     /// A no-op option to match the interface of `git rebase -x`.
     #[arg(short = 'x', hide = true)]
     exec: bool,
@@ -417,7 +417,7 @@ pub fn cmd_run(ui: &mut Ui, command: &CommandHelper, args: &RunArgs) -> Result<(
     let mut workspace_command = command.workspace_helper(ui)?;
     // The commits are already returned in reverse topological order.
     let resolved_commits: Vec<_> = workspace_command
-        .parse_revset(ui, &args.revisions)?
+        .parse_union_revsets(ui, &args.revisions)?
         .evaluate_to_commits()?
         .try_collect()?;
     // Jobs are resolved in this order:
