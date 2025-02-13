@@ -79,6 +79,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * Help text is now colored (when stdout is a terminal).
 
+* Commands that suggest `--ignore-immutable` now print the number of immutable
+  commits that would be rewritten if used.
+
 ### Fixed bugs
 
 * `jj status` now shows untracked files under untracked directories.
