@@ -40,6 +40,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the string in JSON format. It is useful for making machine-readable templates
   by escaping problematic characters like `\n`.
 
+* Commands that suggest `--ignore-immutable` now print the number of immutable
+  commits that would be rewritten if used.
+
 ### Fixed bugs
 
 * `jj status` now shows untracked files under untracked directories.
