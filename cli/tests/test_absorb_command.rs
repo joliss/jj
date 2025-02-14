@@ -734,7 +734,6 @@ fn test_absorb_immutable() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     [EOF]
     "##);

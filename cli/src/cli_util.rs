@@ -1842,10 +1842,6 @@ to the current parents may contain changes from multiple commits.
                 For more information, see:
                       - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
                       - `jj help -k config`, \"Set of immutable commits\""});
-            error.add_hint(
-                "Pass `--ignore-immutable` or configure the set of immutable commits via \
-                 `revset-aliases.immutable_heads()`.",
-            );
 
             let exact = upper_bound == Some(lower_bound);
             let or_more = if exact { "" } else { " or more" };
