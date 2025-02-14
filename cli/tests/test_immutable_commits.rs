@@ -47,7 +47,6 @@ fn test_rewrite_immutable_generic() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // Cannot rewrite an ancestor of the configured set
@@ -59,7 +58,6 @@ fn test_rewrite_immutable_generic() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 2 immutable commits.
     "##);
     // Cannot rewrite the root commit even with an empty set of immutable commits
@@ -224,7 +222,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // absorb
@@ -236,7 +233,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 2 immutable commits.
     "##);
     // chmod
@@ -248,7 +244,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // describe
@@ -260,7 +255,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // diffedit
@@ -272,7 +266,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // edit
@@ -284,7 +277,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // new --insert-before
@@ -296,7 +288,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // new --insert-after parent_of_main
@@ -308,7 +299,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // parallelize
@@ -320,7 +310,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 2 immutable commits.
     "##);
     // rebase -s
@@ -332,7 +321,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // rebase -b
@@ -344,7 +332,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 2 immutable commits.
     "##);
     // rebase -r
@@ -356,7 +343,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // resolve
@@ -368,7 +354,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // restore -c
@@ -380,7 +365,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // restore --into
@@ -392,7 +376,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // split
@@ -404,7 +387,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // squash -r
@@ -416,7 +398,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 4 immutable commits.
     "##);
     // squash --from
@@ -428,7 +409,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // squash --into
@@ -440,7 +420,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
     // unsquash
@@ -454,7 +433,6 @@ fn test_rewrite_immutable_commands() {
     Hint: For more information, see:
           - https://jj-vcs.github.io/jj/latest/config/#set-of-immutable-commits
           - `jj help -k config`, "Set of immutable commits"
-    Hint: Pass `--ignore-immutable` or configure the set of immutable commits via `revset-aliases.immutable_heads()`.
     Hint: This operation would rewrite 1 immutable commit.
     "##);
 }
