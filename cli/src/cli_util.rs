@@ -413,7 +413,14 @@ impl CommandHelper {
     /// Loads workspace and repo, then snapshots the working copy if allowed.
     #[instrument(skip(self, ui))]
     pub fn workspace_helper(&self, ui: &Ui) -> Result<WorkspaceCommandHelper, CommandError> {
-        Ok(self.workspace_helper_with_stats(ui)?.0)
+        let (workspace_command, stats) = self.workspace_helper_with_stats(ui)?;
+        print_snapshot_stats(
+            ui,
+            &stats,
+            workspace_command.env().path_converter(),
+            SnapshotContext::Automatic,
+        )?;
+        Ok(workspace_command)
     }
 
     /// Loads workspace and repo, then snapshots the working copy if allowed and
@@ -1091,8 +1098,16 @@ impl WorkspaceCommandHelper {
     /// copy is collocated with Git.
     #[instrument(skip_all)]
     pub fn maybe_snapshot(&mut self, ui: &Ui) -> Result<SnapshotStats, CommandError> {
-        self.maybe_snapshot_impl(ui)
-            .map_err(|err| err.into_command_error())
+        let stats = self
+            .maybe_snapshot_impl(ui)
+            .map_err(|err| err.into_command_error())?;
+        print_snapshot_stats(
+            ui,
+            &stats,
+            self.path_converter(),
+            SnapshotContext::Automatic,
+        )?;
+        Ok(stats)
     }
 
     /// Imports new HEAD from the colocated Git repo.
@@ -1957,13 +1972,6 @@ See https://jj-vcs.github.io/jj/latest/working-copy/#stale-working-copy \
         locked_ws
             .finish(self.user_repo.repo.op_id().clone())
             .map_err(snapshot_command_error)?;
-        print_snapshot_stats(
-            ui,
-            &stats,
-            &self.env.path_converter,
-            SnapshotContext::Automatic,
-        )
-        .map_err(snapshot_command_error)?;
         Ok(stats)
     }
 
@@ -2652,6 +2660,7 @@ pub fn print_conflicted_paths(
 
 pub enum SnapshotContext {
     Automatic,
+    Status,
     Track,
     Untrack,
 }
