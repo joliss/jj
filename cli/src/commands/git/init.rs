@@ -26,9 +26,11 @@ use jj_lib::repo::Repo;
 use jj_lib::workspace::Workspace;
 
 use super::write_repository_level_trunk_alias;
+use crate::cli_util::print_snapshot_stats;
 use crate::cli_util::print_trackable_remote_bookmarks;
 use crate::cli_util::start_repo_transaction;
 use crate::cli_util::CommandHelper;
+use crate::cli_util::SnapshotContext;
 use crate::cli_util::WorkspaceCommandHelper;
 use crate::command_error::cli_error;
 use crate::command_error::user_error_with_hint;
@@ -170,7 +172,13 @@ fn do_init(
             let repo = init_git_refs(ui, repo, command.string_args(), colocated)?;
             let mut workspace_command = command.for_workable_repo(ui, workspace, repo)?;
             maybe_add_gitignore(&workspace_command)?;
-            workspace_command.maybe_snapshot(ui)?;
+            let stats = workspace_command.maybe_snapshot(ui)?;
+            print_snapshot_stats(
+                ui,
+                &stats,
+                workspace_command.env().path_converter(),
+                SnapshotContext::Automatic,
+            )?;
             maybe_set_repository_level_trunk_alias(ui, &workspace_command)?;
             if !workspace_command.working_copy_shared_with_git() {
                 let mut tx = workspace_command.start_transaction();
