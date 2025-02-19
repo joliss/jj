@@ -22,6 +22,8 @@ use crate::command_error::CommandError;
 use crate::ui::Ui;
 
 /// Show the current workspace root directory
+/// 
+/// Synonymous with `jj workspace root`.
 #[derive(clap::Args, Clone, Debug)]
 pub(crate) struct RootArgs {}
 
