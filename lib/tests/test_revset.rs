@@ -236,36 +236,23 @@ fn test_resolve_symbol_change_id(readonly: bool) {
         .backend_impl()
         .downcast_ref::<GitBackend>()
         .unwrap()
-        .open_git_repo()
-        .unwrap();
+        .git_repo();
     // Add some commits that will end up having change ids with common prefixes
-    let empty_tree_id = git_repo.treebuilder(None).unwrap().write().unwrap();
-    let git_author = git2::Signature::new(
-        "git author",
-        "git.author@example.com",
-        &git2::Time::new(1000, 60),
-    )
-    .unwrap();
-    let git_committer = git2::Signature::new(
-        "git committer",
-        "git.committer@example.com",
-        &git2::Time::new(2000, -480),
-    )
-    .unwrap();
-    let git_tree = git_repo.find_tree(empty_tree_id).unwrap();
+    let mut empty_tree = git_repo
+        .edit_tree(gix::ObjectId::empty_tree(git_repo.object_hash()))
+        .unwrap();
+    let tree_id = empty_tree.write().unwrap().detach();
     let mut git_commit_ids = vec![];
-    for i in &[133, 664, 840, 5085] {
-        let git_commit_id = git_repo
-            .commit(
-                Some(&format!("refs/heads/bookmark{i}")),
-                &git_author,
-                &git_committer,
-                &format!("test {i}"),
-                &git_tree,
-                &[],
-            )
-            .unwrap();
-        git_commit_ids.push(git_commit_id);
+
+    for i in &[133, 320, 1020, 1885] {
+        let commit_id = testutils::git::write_commit(
+            &git_repo,
+            &format!("refs/heads/bookmark{i}"),
+            tree_id,
+            &format!("test {i}"),
+            &[],
+        );
+        git_commit_ids.push(commit_id);
     }
 
     let mut tx = repo.start_transaction();
@@ -273,24 +260,24 @@ fn test_resolve_symbol_change_id(readonly: bool) {
 
     // Test the test setup
     assert_eq!(
-        hex::encode(git_commit_ids[0]),
-        // "04e12a5467bba790efb88a9870894ec208b16bf1" reversed
-        "8fd68d104372910e19511df709e5dde62a548720"
+        git_commit_ids[0].to_hex().to_string(),
+        // 3eb0cd3cb17696fc204aca209ca610b8 reversed
+        "2e7bfe611d086539045352043f696e8d3cb30d7c"
     );
     assert_eq!(
-        hex::encode(git_commit_ids[1]),
-        // "040b3ba3a51d8edbc4c5855cbd09de71d4c29cca" reversed
-        "5339432b8e7b90bd3aa1a323db71b8a5c5dcd020"
+        git_commit_ids[1].to_hex().to_string(),
+        // 04e464e5c6df3f294cb4844d6cf7b97e reversed
+        "193eb84c7e9def36b2212d3294fcfb63a7262720"
     );
     assert_eq!(
-        hex::encode(git_commit_ids[2]),
-        // "04e1c7082e4e34f3f371d8a1a46770b861b9b547" reversed
-        "e2ad9d861d0ee625851b8ecfcf2c727410e38720"
+        git_commit_ids[2].to_hex().to_string(),
+        // 04e0440b3bf173f83210b0a666893e3f reversed
+        "946e7c3bfc7c9166650d084c1fce8fdcd0220720"
     );
     assert_eq!(
-        hex::encode(git_commit_ids[3]),
-        // "911d7e52fd5ba04b8f289e14c3d30b52d38c0020" reversed
-        "040031cb4ad0cbc3287914f1d205dabf4a7eb889"
+        git_commit_ids[3].to_hex().to_string(),
+        // 040dcc2f22a41e7bc7dd7adb6e30a1c8 reversed
+        "49faae0513850c76db5ebbe3de782544f433b020"
     );
 
     let _readonly_repo;
@@ -303,58 +290,58 @@ fn test_resolve_symbol_change_id(readonly: bool) {
 
     // Test lookup by full change id
     assert_eq!(
-        resolve_symbol(repo, "zvlyxpuvtsoopsqzlkorrpqrszrqvlnx").unwrap(),
+        resolve_symbol(repo, "zvlvtvluntmkwkxqvnovrvvmtnksoqsl").unwrap(),
         vec![CommitId::from_hex(
-            "8fd68d104372910e19511df709e5dde62a548720"
+            "193eb84c7e9def36b2212d3294fcfb63a7262720"
         )]
     );
     assert_eq!(
-        resolve_symbol(repo, "zvzowopwpuymrlmonvnuruunomzqmlsy").unwrap(),
+        resolve_symbol(repo, "zvzmnnxkxxpvylsonsmmspmotlwzpynr").unwrap(),
         vec![CommitId::from_hex(
-            "5339432b8e7b90bd3aa1a323db71b8a5c5dcd020"
+            "49faae0513850c76db5ebbe3de782544f433b020"
         )]
     );
     assert_eq!(
-        resolve_symbol(repo, "zvlynszrxlvlwvkwkwsymrpypvtsszor").unwrap(),
+        resolve_symbol(repo, "zvlzvvzowokyswkrwxyzozptttrqwlwk").unwrap(),
         vec![CommitId::from_hex(
-            "e2ad9d861d0ee625851b8ecfcf2c727410e38720"
+            "946e7c3bfc7c9166650d084c1fce8fdcd0220720"
         )]
     );
 
     // Test change id prefix
     assert_eq!(
-        resolve_symbol(repo, "zvlyx").unwrap(),
+        resolve_symbol(repo, "zvlv").unwrap(),
         vec![CommitId::from_hex(
-            "8fd68d104372910e19511df709e5dde62a548720"
+            "193eb84c7e9def36b2212d3294fcfb63a7262720"
         )]
     );
     assert_eq!(
-        resolve_symbol(repo, "zvlyn").unwrap(),
+        resolve_symbol(repo, "zvlz").unwrap(),
         vec![CommitId::from_hex(
-            "e2ad9d861d0ee625851b8ecfcf2c727410e38720"
+            "946e7c3bfc7c9166650d084c1fce8fdcd0220720"
         )]
     );
     assert_matches!(
-        resolve_symbol(repo, "zvly"),
-        Err(RevsetResolutionError::AmbiguousChangeIdPrefix(s)) if s == "zvly"
+        resolve_symbol(repo, "zvl"),
+        Err(RevsetResolutionError::AmbiguousChangeIdPrefix(s)) if s == "zvl"
     );
     assert_matches!(
-        resolve_symbol(repo, "zvlyw"),
-        Err(RevsetResolutionError::NoSuchRevision{name, candidates}) if name == "zvlyw" && candidates.is_empty()
+        resolve_symbol(repo, "zvlw"),
+        Err(RevsetResolutionError::NoSuchRevision{name, candidates}) if name == "zvlw" && candidates.is_empty()
     );
 
-    // Test that commit and changed id don't conflict ("040" and "zvz" are the
+    // Test that commit and changed id don't conflict ("49f" and "zvz" are the
     // same).
     assert_eq!(
-        resolve_symbol(repo, "040").unwrap(),
+        resolve_symbol(repo, "49f").unwrap(),
         vec![CommitId::from_hex(
-            "040031cb4ad0cbc3287914f1d205dabf4a7eb889"
+            "49faae0513850c76db5ebbe3de782544f433b020"
         )]
     );
     assert_eq!(
         resolve_symbol(repo, "zvz").unwrap(),
         vec![CommitId::from_hex(
-            "5339432b8e7b90bd3aa1a323db71b8a5c5dcd020"
+            "49faae0513850c76db5ebbe3de782544f433b020"
         )]
     );
 
