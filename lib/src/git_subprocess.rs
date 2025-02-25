@@ -574,6 +574,7 @@ fn read_to_end_with_progress<R: Read>(
     let mut reader = BufReader::new(src);
     let mut data = Vec::new();
     let mut git_progress = GitProgress::default();
+    let mut skip_stderr = false;
 
     loop {
         // progress sent through sideband channel may be terminated by \r
@@ -610,6 +611,20 @@ fn read_to_end_with_progress<R: Read>(
                 }
             }
             data.truncate(start);
+        } else {
+            // as soon as we hit recognizable output (either error, git-fetch output or
+            // git-push porcelain) we want to preempt outputting to the client
+            // so we can parse it first
+            skip_stderr |= line.starts_with(b"fatal: ")
+                || line.starts_with(b"error: ")
+                || line.starts_with(b"From ")
+                || line.starts_with(b"To ");
+            if !skip_stderr {
+                if let Some(cb) = callbacks.stderr.as_mut() {
+                    cb(line);
+                    data.truncate(start);
+                }
+            }
         }
     }
     Ok(data)
@@ -798,31 +813,40 @@ Done";
         let read = |sample: &[u8]| {
             let mut progress = Vec::new();
             let mut sideband = Vec::new();
+            let mut stderr = Vec::new();
             let mut callbacks = RemoteCallbacks::default();
             let mut progress_cb = |p: &Progress| progress.push(p.clone());
             callbacks.progress = Some(&mut progress_cb);
             let mut sideband_cb = |s: &[u8]| sideband.push(s.to_owned());
             callbacks.sideband_progress = Some(&mut sideband_cb);
+            let mut stderr_cb = |s: &[u8]| stderr.push(s.to_owned());
+            callbacks.stderr = Some(&mut stderr_cb);
             let output = read_to_end_with_progress(&mut &sample[..], &mut callbacks).unwrap();
-            (output, sideband, progress)
+            (output, sideband, progress, stderr)
         };
         const DUMB_SUFFIX: &str = "        ";
         let sample = formatdoc! {"
+            auth message
             remote: line1{DUMB_SUFFIX}
             blah blah
             remote: line2.0{DUMB_SUFFIX}\rremote: line2.1{DUMB_SUFFIX}
             remote: line3{DUMB_SUFFIX}
             Resolving deltas: (12/24)
-            some error message
+            fatal: some error message
+            more error
         "};
 
-        let (output, sideband, progress) = read(sample.as_bytes());
+        let (output, sideband, progress, stderr) = read(sample.as_bytes());
         assert_eq!(
             sideband,
             ["line1", "\n", "line2.0", "\r", "line2.1", "\n", "line3", "\n"]
                 .map(|s| s.as_bytes().to_owned())
         );
-        assert_eq!(output, b"blah blah\nsome error message\n");
+        assert_eq!(
+            stderr,
+            ["auth message\n", "blah blah\n"].map(|s| s.as_bytes().to_owned())
+        );
+        assert_eq!(output, b"fatal: some error message\nmore error\n");
         insta::assert_debug_snapshot!(progress, @r"
         [
             Progress {
@@ -833,13 +857,17 @@ Done";
         ");
 
         // without last newline
-        let (output, sideband, _progress) = read(sample.as_bytes().trim_end());
+        let (output, sideband, _progress, stderr) = read(sample.as_bytes().trim_end());
         assert_eq!(
             sideband,
             ["line1", "\n", "line2.0", "\r", "line2.1", "\n", "line3", "\n"]
                 .map(|s| s.as_bytes().to_owned())
         );
-        assert_eq!(output, b"blah blah\nsome error message");
+        assert_eq!(
+            stderr,
+            ["auth message\n", "blah blah\n"].map(|s| s.as_bytes().to_owned())
+        );
+        assert_eq!(output, b"fatal: some error message\nmore error");
     }
 
     #[test]

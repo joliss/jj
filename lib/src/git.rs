@@ -2242,6 +2242,7 @@ fn allow_push(
 pub struct RemoteCallbacks<'a> {
     pub progress: Option<&'a mut dyn FnMut(&Progress)>,
     pub sideband_progress: Option<&'a mut dyn FnMut(&[u8])>,
+    pub stderr: Option<&'a mut dyn FnMut(&[u8])>,
     pub get_ssh_keys: Option<&'a mut dyn FnMut(&str) -> Vec<PathBuf>>,
     pub get_password: Option<&'a mut dyn FnMut(&str, &str) -> Option<String>>,
     pub get_username_password: Option<&'a mut dyn FnMut(&str) -> Option<(String, String)>>,

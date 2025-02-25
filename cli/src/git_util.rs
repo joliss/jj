@@ -270,6 +270,11 @@ pub fn with_remote_git_callbacks<T>(ui: &Ui, f: impl FnOnce(git::RemoteCallbacks
     };
     callbacks.sideband_progress = Some(&mut sideband_progress_callback);
 
+    let mut stderr = |message: &[u8]| {
+        _ = ui.stderr().write(message);
+    };
+    callbacks.stderr = Some(&mut stderr);
+
     let mut get_ssh_keys = get_ssh_keys; // Coerce to unit fn type
     callbacks.get_ssh_keys = Some(&mut get_ssh_keys);
     let mut get_pw =
