@@ -14,6 +14,9 @@
 
 #![allow(missing_docs)]
 
+// Important: This is not freestanding yet (still linked into the jj-binary), as
+// it still is used by tests. see lib/src/lib.rs and search for #[path = "..."].
+
 use std::any::Any;
 use std::fmt::Debug;
 use std::fs;
@@ -87,6 +90,7 @@ fn to_other_err(err: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Bac
     BackendError::Other(err.into())
 }
 
+/// A simple Toy backend which shows how to implement a Jujutsu backend.
 #[derive(Debug)]
 pub struct ToyBackend {
     path: PathBuf,

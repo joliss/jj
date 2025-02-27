@@ -105,6 +105,8 @@ pub mod submodule_store;
 #[cfg(feature = "testing")]
 pub mod test_signing_backend;
 pub mod time_util;
+// Allow this file to be outside the normal crate.
+#[path = "../../cli/examples/toy-backend/toy_backend.rs"]
 pub mod toy_backend;
 pub mod transaction;
 pub mod tree;
