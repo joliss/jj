@@ -155,7 +155,7 @@ pub(crate) fn cmd_fix(
 
     let mut tx = workspace_command.start_transaction();
 
-    // Collect all of the unique `ToolInput`s we're going to use. Tools should be
+    // Collect all of the unique `FileToFix`s we're going to use. Tools should be
     // deterministic, and should not consider outside information, so it is safe to
     // deduplicate inputs that correspond to multiple files or commits. This is
     // typically more efficient, but it does prevent certain use cases like
@@ -176,7 +176,7 @@ pub(crate) fn cmd_fix(
         .iter()
         .commits(tx.repo().store())
         .try_collect()?;
-    let mut unique_tool_inputs: HashSet<ToolInput> = HashSet::new();
+    let mut unique_files_to_fix: HashSet<FileToFix> = HashSet::new();
     let mut commit_paths: HashMap<CommitId, HashSet<RepoPathBuf>> = HashMap::new();
     for commit in commits.iter().rev() {
         let mut paths: HashSet<RepoPathBuf> = HashSet::new();
@@ -213,11 +213,11 @@ pub(crate) fn cmd_fix(
                     if let TreeValue::File { id, executable: _ } = term {
                         // TODO: Skip the file if its content is larger than some configured size,
                         // preferably without actually reading it yet.
-                        let tool_input = ToolInput {
+                        let file_to_fix = FileToFix {
                             file_id: id.clone(),
                             repo_path: repo_path.clone(),
                         };
-                        unique_tool_inputs.insert(tool_input.clone());
+                        unique_files_to_fix.insert(file_to_fix.clone());
                         paths.insert(repo_path.clone());
                     }
                 }
@@ -234,7 +234,7 @@ pub(crate) fn cmd_fix(
         tx.repo().store().as_ref(),
         &workspace_root,
         &tools_config,
-        &unique_tool_inputs,
+        &unique_files_to_fix,
     )?;
 
     // Substitute the fixed file IDs into all of the affected commits. Currently,
@@ -255,11 +255,11 @@ pub(crate) fn cmd_fix(
                 let old_value = old_tree.path_value(repo_path)?;
                 let new_value = old_value.map(|old_term| {
                     if let Some(TreeValue::File { id, executable }) = old_term {
-                        let tool_input = ToolInput {
+                        let file_to_fix = FileToFix {
                             file_id: id.clone(),
                             repo_path: repo_path.clone(),
                         };
-                        if let Some(new_id) = fixed_file_ids.get(&tool_input) {
+                        if let Some(new_id) = fixed_file_ids.get(&file_to_fix) {
                             return Some(TreeValue::File {
                                 id: new_id.clone(),
                                 executable: *executable,
@@ -295,7 +295,7 @@ pub(crate) fn cmd_fix(
 // flags. This will help avoid introducing unrelated changes when working on code with out of date
 // formatting.
 #[derive(PartialEq, Eq, Hash, Clone)]
-struct ToolInput {
+struct FileToFix {
     /// File content is the primary input, provided on the tool's standard
     /// input. We use the `FileId` as a placeholder here, so we can hold all
     /// the inputs in memory without also holding all the content at once.
@@ -311,7 +311,7 @@ struct ToolInput {
 
 /// Applies `run_tool()` to the inputs and stores the resulting file content.
 ///
-/// Returns a map describing the subset of `tool_inputs` that resulted in
+/// Returns a map describing the subset of `files_to_fix` that resulted in
 /// changed file content. Failures when handling an input will cause it to be
 /// omitted from the return value, which is indistinguishable from succeeding
 /// with no changes.
@@ -321,32 +321,32 @@ fn fix_file_ids<'a>(
     store: &Store,
     workspace_root: &Path,
     tools_config: &ToolsConfig,
-    tool_inputs: &'a HashSet<ToolInput>,
-) -> Result<HashMap<&'a ToolInput, FileId>, CommandError> {
+    files_to_fix: &'a HashSet<FileToFix>,
+) -> Result<HashMap<&'a FileToFix, FileId>, CommandError> {
     let (updates_tx, updates_rx) = channel();
     // TODO: Switch to futures, or document the decision not to. We don't need
     // threads unless the threads will be doing more than waiting for pipes.
-    tool_inputs.into_par_iter().try_for_each_init(
+    files_to_fix.into_par_iter().try_for_each_init(
         || updates_tx.clone(),
-        |updates_tx, tool_input| -> Result<(), CommandError> {
+        |updates_tx, file_to_fix| -> Result<(), CommandError> {
             let mut matching_tools = tools_config
                 .tools
                 .iter()
-                .filter(|tool_config| tool_config.matcher.matches(&tool_input.repo_path))
+                .filter(|tool_config| tool_config.matcher.matches(&file_to_fix.repo_path))
                 .peekable();
             if matching_tools.peek().is_some() {
                 // The first matching tool gets its input from the committed file, and any
                 // subsequent matching tool gets its input from the previous matching tool's
                 // output.
                 let mut old_content = vec![];
-                let mut read = store.read_file(&tool_input.repo_path, &tool_input.file_id)?;
+                let mut read = store.read_file(&file_to_fix.repo_path, &file_to_fix.file_id)?;
                 read.read_to_end(&mut old_content)?;
                 let new_content =
                     matching_tools.fold(old_content.clone(), |prev_content, tool_config| {
                         match run_tool(
                             workspace_root,
                             &tool_config.command,
-                            tool_input,
+                            file_to_fix,
                             &prev_content,
                         ) {
                             Ok(next_content) => next_content,
@@ -359,9 +359,9 @@ fn fix_file_ids<'a>(
                 if new_content != old_content {
                     // TODO: send futures back over channel
                     let new_file_id = store
-                        .write_file(&tool_input.repo_path, &mut new_content.as_slice())
+                        .write_file(&file_to_fix.repo_path, &mut new_content.as_slice())
                         .block_on()?;
-                    updates_tx.send((tool_input, new_file_id)).unwrap();
+                    updates_tx.send((file_to_fix, new_file_id)).unwrap();
                 }
             }
             Ok(())
@@ -369,15 +369,15 @@ fn fix_file_ids<'a>(
     )?;
     drop(updates_tx);
     let mut result = HashMap::new();
-    while let Ok((tool_input, new_file_id)) = updates_rx.recv() {
-        result.insert(tool_input, new_file_id);
+    while let Ok((file_to_fix, new_file_id)) = updates_rx.recv() {
+        result.insert(file_to_fix, new_file_id);
     }
     Ok(result)
 }
 
 /// Runs the `tool_command` to fix the given file content.
 ///
-/// The `old_content` is assumed to be that of the `tool_input`'s `FileId`, but
+/// The `old_content` is assumed to be that of the `file_to_fix`'s `FileId`, but
 /// this is not verified.
 ///
 /// Returns the new file content, whose value will be the same as `old_content`
@@ -386,15 +386,15 @@ fn fix_file_ids<'a>(
 fn run_tool(
     workspace_root: &Path,
     tool_command: &CommandNameAndArgs,
-    tool_input: &ToolInput,
+    file_to_fix: &FileToFix,
     old_content: &[u8],
 ) -> Result<Vec<u8>, ()> {
     // TODO: Pipe stderr so we can tell the user which commit, file, and tool it is
     // associated with.
     let mut vars: HashMap<&str, &str> = HashMap::new();
-    vars.insert("path", tool_input.repo_path.as_internal_file_string());
+    vars.insert("path", file_to_fix.repo_path.as_internal_file_string());
     let mut command = tool_command.to_command_with_variables(&vars);
-    tracing::debug!(?command, ?tool_input.repo_path, "spawning fix tool");
+    tracing::debug!(?command, ?file_to_fix.repo_path, "spawning fix tool");
     let mut child = command
         .current_dir(workspace_root)
         .stdin(Stdio::piped())
