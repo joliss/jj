@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Write;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::mpsc::channel;
 
@@ -33,6 +34,7 @@ use jj_lib::matchers::Matcher;
 use jj_lib::merged_tree::MergedTree;
 use jj_lib::merged_tree::MergedTreeBuilder;
 use jj_lib::merged_tree::TreeDiffEntry;
+use jj_lib::repo::MutableRepo;
 use jj_lib::repo::Repo;
 use jj_lib::repo_path::RepoPathBuf;
 use jj_lib::repo_path::RepoPathUiConverter;
@@ -154,13 +156,58 @@ pub(crate) fn cmd_fix(
         .to_matcher();
 
     let mut tx = workspace_command.start_transaction();
+    let summary = do_fix(
+        workspace_root,
+        root_commits,
+        matcher,
+        args.include_unchanged_files,
+        tx.repo_mut(),
+        |store, workspace_root, files_to_fix| {
+            fix_file_ids(store, workspace_root, &tools_config, files_to_fix)
+        },
+    )?;
+    writeln!(
+        ui.status(),
+        "Fixed {} commits of {} checked.",
+        summary.num_fixed_commits,
+        summary.num_checked_commits
+    )?;
+    tx.finish(ui, format!("fixed {} commits", summary.num_fixed_commits))
+}
+
+struct FixSummary {
+    num_checked_commits: i32,
+    num_fixed_commits: i32,
+}
+
+/// Calls fix_files_fn to fix files. The path argument to fix_files_fn receives
+/// the workspace root.
+fn do_fix<F>(
+    workspace_root: PathBuf,
+    root_commits: Vec<CommitId>,
+    matcher: Box<dyn Matcher>,
+    include_unchanged_files: bool,
+    repo_mut: &mut MutableRepo,
+    fix_files_fn: F,
+) -> Result<FixSummary, CommandError>
+where
+    for<'a> F: FnOnce(
+        &Store,
+        &Path,
+        &'a HashSet<FileToFix>,
+    ) -> Result<HashMap<&'a FileToFix, FileId>, CommandError>,
+{
+    let mut summary = FixSummary {
+        num_checked_commits: 0,
+        num_fixed_commits: 0,
+    };
 
     // Collect all of the unique `FileToFix`s we're going to use. Tools should be
     // deterministic, and should not consider outside information, so it is safe to
     // deduplicate inputs that correspond to multiple files or commits. This is
     // typically more efficient, but it does prevent certain use cases like
     // providing commit IDs as inputs to be inserted into files. We also need to
-    // record the mapping between tool inputs and paths/commits, to efficiently
+    // record the mapping between files-to-fix and paths/commits, to efficiently
     // rewrite the commits later.
     //
     // If a path is being fixed in a particular commit, it must also be fixed in all
@@ -172,9 +219,9 @@ pub(crate) fn cmd_fix(
     // doing this in long chains of commits with disjoint sets of modified files.
     let commits: Vec<_> = RevsetExpression::commits(root_commits.clone())
         .descendants()
-        .evaluate(tx.base_repo().as_ref())?
+        .evaluate(repo_mut.base_repo().as_ref())?
         .iter()
-        .commits(tx.repo().store())
+        .commits(repo_mut.store())
         .try_collect()?;
     let mut unique_files_to_fix: HashSet<FileToFix> = HashSet::new();
     let mut commit_paths: HashMap<CommitId, HashSet<RepoPathBuf>> = HashMap::new();
@@ -185,15 +232,15 @@ pub(crate) fn cmd_fix(
         // Otherwise, we fix the matching changed files in this commit, plus any that
         // were fixed in ancestors, so we don't lose those changes. We do this
         // instead of rebasing onto those changes, to avoid merge conflicts.
-        let parent_tree = if args.include_unchanged_files {
-            MergedTree::resolved(Tree::empty(tx.repo().store().clone(), RepoPathBuf::root()))
+        let parent_tree = if include_unchanged_files {
+            MergedTree::resolved(Tree::empty(repo_mut.store().clone(), RepoPathBuf::root()))
         } else {
             for parent_id in commit.parent_ids() {
                 if let Some(parent_paths) = commit_paths.get(parent_id) {
                     paths.extend(parent_paths.iter().cloned());
                 }
             }
-            commit.parent_tree(tx.repo())?
+            commit.parent_tree(repo_mut)?
         };
         // TODO: handle copy tracking
         let mut diff_stream = parent_tree.diff_stream(&commit.tree()?, &matcher);
@@ -205,8 +252,8 @@ pub(crate) fn cmd_fix(
             {
                 let (_before, after) = values?;
                 // Deleted files have no file content to fix, and they have no terms in `after`,
-                // so we don't add any tool inputs for them. Conflicted files produce one tool
-                // input for each side of the conflict.
+                // so we don't add any files-to-fix for them. Conflicted files produce one
+                // file-to-fix for each side of the conflict.
                 for term in after.into_iter().flatten() {
                     // We currently only support fixing the content of normal files, so we skip
                     // directories and symlinks, and we ignore the executable bit.
@@ -229,20 +276,17 @@ pub(crate) fn cmd_fix(
         commit_paths.insert(commit.id().clone(), paths);
     }
 
-    // Run the configured tool on all of the chosen inputs.
-    let fixed_file_ids = fix_file_ids(
-        tx.repo().store().as_ref(),
+    // Fix all of the chosen inputs.
+    let fixed_file_ids = fix_files_fn(
+        repo_mut.store().as_ref(),
         &workspace_root,
-        &tools_config,
         &unique_files_to_fix,
     )?;
 
     // Substitute the fixed file IDs into all of the affected commits. Currently,
     // fixes cannot delete or rename files, change the executable bit, or modify
     // other parts of the commit like the description.
-    let mut num_checked_commits = 0;
-    let mut num_fixed_commits = 0;
-    tx.repo_mut().transform_descendants(
+    repo_mut.transform_descendants(
         root_commits.iter().cloned().collect_vec(),
         |mut rewriter| {
             // TODO: Build the trees in parallel before `transform_descendants()` and only
@@ -273,9 +317,9 @@ pub(crate) fn cmd_fix(
                     changes += 1;
                 }
             }
-            num_checked_commits += 1;
+            summary.num_checked_commits += 1;
             if changes > 0 {
-                num_fixed_commits += 1;
+                summary.num_fixed_commits += 1;
                 let new_tree = tree_builder.write_tree(rewriter.mut_repo().store())?;
                 let builder = rewriter.reparent();
                 builder.set_tree_id(new_tree).write()?;
@@ -283,11 +327,8 @@ pub(crate) fn cmd_fix(
             Ok(())
         },
     )?;
-    writeln!(
-        ui.status(),
-        "Fixed {num_fixed_commits} commits of {num_checked_commits} checked."
-    )?;
-    tx.finish(ui, format!("fixed {num_fixed_commits} commits"))
+
+    Ok(summary)
 }
 
 /// Represents the API between `jj fix` and the tools it runs.
