@@ -1180,6 +1180,7 @@ impl MutableRepo {
     fn find_descendants_to_rebase(
         &self,
         roots: Vec<CommitId>,
+        mut parents_callback: impl FnMut(&Commit, &dyn Repo) -> Option<Vec<CommitId>>,
     ) -> BackendResult<Vec<(Commit, Vec<CommitId>)>> {
         let store = self.store();
         let to_visit_expression =
@@ -1210,12 +1211,10 @@ impl MutableRepo {
             |commit| -> Vec<BackendResult<Commit>> {
                 visited.insert(commit.id().clone());
                 let mut dependents = vec![];
-                let parent_ids = commit.parent_ids();
-                parents_map.insert(
-                    commit.id().clone(),
-                    parent_ids.iter().cloned().collect_vec(),
-                );
-                for parent_id in parent_ids {
+                let parent_ids = parents_callback(commit, self)
+                    .unwrap_or_else(|| commit.parent_ids().iter().cloned().collect_vec());
+                parents_map.insert(commit.id().clone(), parent_ids.clone());
+                for parent_id in &parent_ids {
                     let parent = store.get_commit(parent_id);
                     let Ok(parent) = parent else {
                         dependents.push(parent);
@@ -1262,7 +1261,7 @@ impl MutableRepo {
         callback: impl FnMut(CommitRewriter) -> BackendResult<()>,
     ) -> BackendResult<()> {
         let options = RewriteRefsOptions::default();
-        self.transform_descendants_with_options(roots, &options, callback)
+        self.transform_descendants_with_options(roots, &options, |_, _| None, callback)
     }
 
     /// Rewrite descendants of the given roots with options.
@@ -1272,9 +1271,10 @@ impl MutableRepo {
         &mut self,
         roots: Vec<CommitId>,
         options: &RewriteRefsOptions,
+        parents_callback: impl FnMut(&Commit, &dyn Repo) -> Option<Vec<CommitId>>,
         mut callback: impl FnMut(CommitRewriter) -> BackendResult<()>,
     ) -> BackendResult<()> {
-        let mut to_visit = self.find_descendants_to_rebase(roots)?;
+        let mut to_visit = self.find_descendants_to_rebase(roots, parents_callback)?;
         while let Some((old_commit, parent_ids)) = to_visit.pop() {
             let new_parent_ids = self.new_parents(&parent_ids);
             let rewriter = CommitRewriter::new(self, old_commit, new_parent_ids);
@@ -1314,14 +1314,19 @@ impl MutableRepo {
         mut progress: impl FnMut(Commit, RebasedCommit),
     ) -> BackendResult<()> {
         let roots = self.parent_mapping.keys().cloned().collect();
-        self.transform_descendants_with_options(roots, &options.rewrite_refs, |rewriter| {
-            if rewriter.parents_changed() {
-                let old_commit = rewriter.old_commit().clone();
-                let rebased_commit = rebase_commit_with_options(rewriter, options)?;
-                progress(old_commit, rebased_commit);
-            }
-            Ok(())
-        })?;
+        self.transform_descendants_with_options(
+            roots,
+            &options.rewrite_refs,
+            |_, _| None,
+            |rewriter| {
+                if rewriter.parents_changed() {
+                    let old_commit = rewriter.old_commit().clone();
+                    let rebased_commit = rebase_commit_with_options(rewriter, options)?;
+                    progress(old_commit, rebased_commit);
+                }
+                Ok(())
+            },
+        )?;
         self.parent_mapping.clear();
         Ok(())
     }
