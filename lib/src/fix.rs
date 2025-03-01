@@ -12,24 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! API for running an external tool to fix files modified in a workspace.
+
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Stdio;
-use std::sync::mpsc::channel;
 
-use clap_complete::ArgValueCandidates;
 use futures::StreamExt;
 use itertools::Itertools;
 use jj_lib::backend::BackendError;
 use jj_lib::backend::CommitId;
 use jj_lib::backend::FileId;
 use jj_lib::backend::TreeValue;
-use jj_lib::fileset;
-use jj_lib::fileset::FilesetDiagnostics;
-use jj_lib::fileset::FilesetExpression;
 use jj_lib::matchers::Matcher;
 use jj_lib::merged_tree::MergedTree;
 use jj_lib::merged_tree::MergedTreeBuilder;
@@ -37,25 +32,14 @@ use jj_lib::merged_tree::TreeDiffEntry;
 use jj_lib::repo::MutableRepo;
 use jj_lib::repo::Repo;
 use jj_lib::repo_path::RepoPathBuf;
-use jj_lib::repo_path::RepoPathUiConverter;
 use jj_lib::revset::RevsetExpression;
 use jj_lib::revset::RevsetIteratorExt;
-use jj_lib::settings::UserSettings;
 use jj_lib::store::Store;
 use jj_lib::tree::Tree;
 use pollster::FutureExt;
-use rayon::iter::IntoParallelIterator;
-use rayon::prelude::ParallelIterator;
-use tracing::instrument;
+use thiserror::Error;
 
-use crate::cli_util::CommandHelper;
-use crate::cli_util::RevisionArg;
-use crate::command_error::config_error;
-use crate::command_error::print_parse_diagnostics;
-use crate::command_error::CommandError;
-use crate::complete;
-use crate::config::CommandNameAndArgs;
-use crate::ui::Ui;
+use crate::revset::RevsetEvaluationError;
 
 /// Represents the API between `jj fix` and the tools it runs.
 // TODO: Add the set of changed line/byte ranges, so those can be passed into code formatters via
@@ -66,16 +50,35 @@ pub struct FileToFix {
     /// File content is the primary input, provided on the tool's standard
     /// input. We use the `FileId` as a placeholder here, so we can hold all
     /// the inputs in memory without also holding all the content at once.
-    file_id: FileId,
+    pub file_id: FileId,
 
     /// The path is provided to allow passing it into the tool so it can
     /// potentially:
     ///  - Choose different behaviors for different file names, extensions, etc.
     ///  - Update parts of the file's content that should be derived from the
     ///    file's path.
-    repo_path: RepoPathBuf,
+    pub repo_path: RepoPathBuf,
 }
 
+/// Error fixing files.
+#[derive(Debug, Error)]
+pub enum FixError {
+    /// Error while contacting the Backend.
+    #[error(transparent)]
+    Backend(#[from] BackendError),
+    /// Error resolving commit ancestry.
+    #[error(transparent)]
+    RevsetEvaluation(#[from] RevsetEvaluationError),
+    /// Error occurred while reading/writing file content.
+    #[error(transparent)]
+    IO(#[from] std::io::Error),
+}
+
+/// Fixes a set of files.
+///
+/// Fixing a file is implementation dependent. For some files containing source
+/// code "fixing" the file may mean passing the file contents through a code
+/// formatter.
 pub trait FileFixer {
     /// Fixes a set of files and stores the resulting file content.
     ///
@@ -91,23 +94,27 @@ pub trait FileFixer {
         store: &Store,
         workspace_root: &Path,
         files_to_fix: &'a HashSet<FileToFix>,
-    ) -> Result<HashMap<&'a FileToFix, FileId>, CommandError>;
+    ) -> Result<HashMap<&'a FileToFix, FileId>, FixError>;
 }
 
+/// Aggregate information about the outcome of the file fixer.
 pub struct FixSummary {
-    num_checked_commits: i32,
-    num_fixed_commits: i32,
+    /// The number of commits that had files that were passed to the file fixer.
+    pub num_checked_commits: i32,
+    /// The number of new commits created due to file content changed by the
+    /// fixer.
+    pub num_fixed_commits: i32,
 }
 
 /// Calls file_fixer to fix files.
-pub fn do_fix(
+pub fn fix_files(
     workspace_root: PathBuf,
     root_commits: Vec<CommitId>,
     matcher: Box<dyn Matcher>,
     include_unchanged_files: bool,
     repo_mut: &mut MutableRepo,
     file_fixer: &mut impl FileFixer,
-) -> Result<FixSummary, CommandError> {
+) -> Result<FixSummary, FixError> {
     let mut summary = FixSummary {
         num_checked_commits: 0,
         num_fixed_commits: 0,
