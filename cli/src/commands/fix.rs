@@ -133,6 +133,64 @@ pub(crate) struct FixArgs {
     include_unchanged_files: bool,
 }
 
+/// Represents the API between `jj fix` and the tools it runs.
+// TODO: Add the set of changed line/byte ranges, so those can be passed into code formatters via
+// flags. This will help avoid introducing unrelated changes when working on code with out of date
+// formatting.
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub struct FileToFix {
+    /// File content is the primary input, provided on the tool's standard
+    /// input. We use the `FileId` as a placeholder here, so we can hold all
+    /// the inputs in memory without also holding all the content at once.
+    file_id: FileId,
+
+    /// The path is provided to allow passing it into the tool so it can
+    /// potentially:
+    ///  - Choose different behaviors for different file names, extensions, etc.
+    ///  - Update parts of the file's content that should be derived from the
+    ///    file's path.
+    repo_path: RepoPathBuf,
+}
+
+pub trait FileFixer {
+    /// Fixes a set of files and stores the resulting file content.
+    ///
+    /// Fixing a file may for example run a code formatter on the file contents.
+    /// Returns a map describing the subset of `files_to_fix` that resulted in
+    /// changed file content. Failures when handling an input will cause it to
+    /// be omitted from the return value, which is indistinguishable from
+    /// succeeding with no changes.
+    /// TODO: Better error handling so we can tell the user what went wrong with
+    /// each failed input.
+    fn fix_files<'a>(
+        &mut self,
+        store: &Store,
+        workspace_root: &Path,
+        files_to_fix: &'a HashSet<FileToFix>,
+    ) -> Result<HashMap<&'a FileToFix, FileId>, CommandError>;
+}
+
+struct CliFileFixer {
+    tools_config: ToolsConfig,
+}
+
+impl CliFileFixer {
+    fn new(tools_config: ToolsConfig) -> Self {
+        Self { tools_config }
+    }
+}
+
+impl FileFixer for CliFileFixer {
+    fn fix_files<'a>(
+        &mut self,
+        store: &Store,
+        workspace_root: &Path,
+        files_to_fix: &'a HashSet<FileToFix>,
+    ) -> Result<HashMap<&'a FileToFix, FileId>, CommandError> {
+        fix_file_ids(store, workspace_root, &self.tools_config, files_to_fix)
+    }
+}
+
 #[instrument(skip_all)]
 pub(crate) fn cmd_fix(
     ui: &mut Ui,
@@ -142,6 +200,7 @@ pub(crate) fn cmd_fix(
     let mut workspace_command = command.workspace_helper(ui)?;
     let workspace_root = workspace_command.workspace_root().to_owned();
     let tools_config = get_tools_config(ui, workspace_command.settings())?;
+    let mut file_fixer = CliFileFixer::new(tools_config);
     let root_commits: Vec<CommitId> = if args.source.is_empty() {
         let revs = workspace_command.settings().get_string("revsets.fix")?;
         workspace_command.parse_revset(ui, &RevisionArg::from(revs))?
@@ -162,9 +221,7 @@ pub(crate) fn cmd_fix(
         matcher,
         args.include_unchanged_files,
         tx.repo_mut(),
-        |store, workspace_root, files_to_fix| {
-            fix_file_ids(store, workspace_root, &tools_config, files_to_fix)
-        },
+        &mut file_fixer,
     )?;
     writeln!(
         ui.status(),
@@ -182,21 +239,14 @@ struct FixSummary {
 
 /// Calls fix_files_fn to fix files. The path argument to fix_files_fn receives
 /// the workspace root.
-fn do_fix<F>(
+fn do_fix(
     workspace_root: PathBuf,
     root_commits: Vec<CommitId>,
     matcher: Box<dyn Matcher>,
     include_unchanged_files: bool,
     repo_mut: &mut MutableRepo,
-    fix_files_fn: F,
-) -> Result<FixSummary, CommandError>
-where
-    for<'a> F: FnOnce(
-        &Store,
-        &Path,
-        &'a HashSet<FileToFix>,
-    ) -> Result<HashMap<&'a FileToFix, FileId>, CommandError>,
-{
+    file_fixer: &mut impl FileFixer,
+) -> Result<FixSummary, CommandError> {
     let mut summary = FixSummary {
         num_checked_commits: 0,
         num_fixed_commits: 0,
@@ -277,7 +327,7 @@ where
     }
 
     // Fix all of the chosen inputs.
-    let fixed_file_ids = fix_files_fn(
+    let fixed_file_ids = file_fixer.fix_files(
         repo_mut.store().as_ref(),
         &workspace_root,
         &unique_files_to_fix,
@@ -329,25 +379,6 @@ where
     )?;
 
     Ok(summary)
-}
-
-/// Represents the API between `jj fix` and the tools it runs.
-// TODO: Add the set of changed line/byte ranges, so those can be passed into code formatters via
-// flags. This will help avoid introducing unrelated changes when working on code with out of date
-// formatting.
-#[derive(PartialEq, Eq, Hash, Clone)]
-struct FileToFix {
-    /// File content is the primary input, provided on the tool's standard
-    /// input. We use the `FileId` as a placeholder here, so we can hold all
-    /// the inputs in memory without also holding all the content at once.
-    file_id: FileId,
-
-    /// The path is provided to allow passing it into the tool so it can
-    /// potentially:
-    ///  - Choose different behaviors for different file names, extensions, etc.
-    ///  - Update parts of the file's content that should be derived from the
-    ///    file's path.
-    repo_path: RepoPathBuf,
 }
 
 /// Applies `run_tool()` to the inputs and stores the resulting file content.
