@@ -100,6 +100,7 @@ use jj_lib::revset;
 use jj_lib::revset::ResolvedRevsetExpression;
 use jj_lib::revset::RevsetAliasesMap;
 use jj_lib::revset::RevsetDiagnostics;
+use jj_lib::revset::RevsetEvaluationError;
 use jj_lib::revset::RevsetExpression;
 use jj_lib::revset::RevsetExtensions;
 use jj_lib::revset::RevsetFilterPredicate;
@@ -1597,6 +1598,29 @@ to the current parents may contain changes from multiple commits.
         ui: &Ui,
         revision_args: &[RevisionArg],
     ) -> Result<IndexSet<Commit>, CommandError> {
+        let all_commits = self
+            .resolve_some_revsets_commit_ids_default_single(ui, revision_args)?
+            .iter()
+            .map(|id| {
+                self.repo()
+                    .store()
+                    .get_commit(id)
+                    .map_err(RevsetEvaluationError::StoreError)
+            })
+            .try_collect()?;
+        Ok(all_commits)
+    }
+
+    /// Evaluates revset expressions to non-empty set of commit IDs. The
+    /// returned set preserves the order of the input expressions.
+    ///
+    /// If an input expression is prefixed with `all:`, it may be evaluated to
+    /// any number of revisions (including 0.)
+    pub fn resolve_some_revsets_commit_ids_default_single(
+        &self,
+        ui: &Ui,
+        revision_args: &[RevisionArg],
+    ) -> Result<IndexSet<CommitId>, CommandError> {
         let mut all_commits = IndexSet::new();
         for revision_arg in revision_args {
             let (expression, modifier) = self.parse_revset_with_modifier(ui, revision_arg)?;
@@ -1605,8 +1629,8 @@ to the current parents may contain changes from multiple commits.
                 None => self.settings().get_bool("ui.always-allow-large-revsets")?,
             };
             if all {
-                for commit in expression.evaluate_to_commits()? {
-                    all_commits.insert(commit?);
+                for commit_id in expression.evaluate_to_commit_ids()? {
+                    all_commits.insert(commit_id?);
                 }
             } else {
                 let should_hint_about_all_prefix = true;
@@ -1616,8 +1640,8 @@ to the current parents may contain changes from multiple commits.
                     || self.commit_summary_template(),
                     should_hint_about_all_prefix,
                 )?;
-                let commit_hash = short_commit_hash(commit.id());
-                if !all_commits.insert(commit) {
+                if !all_commits.insert(commit.id().clone()) {
+                    let commit_hash = short_commit_hash(commit.id());
                     return Err(user_error(format!(
                         r#"More than one revset resolved to revision {commit_hash}"#,
                     )));
