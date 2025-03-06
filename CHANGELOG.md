@@ -43,6 +43,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * `jj op log -d` now has an alias for `jj op log --op-diff`.
 
+* A new command `jj revert` is added, which is similar to `jj backout` but
+  adds the `--destination`, `--insert-after`, and `--insert-before` options to
+  customize the location of reverted commits.
+
 ### Fixed bugs
 
 ## [0.27.0] - 2025-03-05
