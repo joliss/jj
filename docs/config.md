@@ -1221,8 +1221,9 @@ behavior = "drop"
 backend = "ssh"
 key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGj+J6N6SO+4P8dOZqfR1oiay2yxhhHnagH52avUqw5h"
 
-[git]
-sign-on-push = true
+[git.sign-on-push]
+enabled = true
+behavior = "own"
 ```
 
 ### Manually signing commits
