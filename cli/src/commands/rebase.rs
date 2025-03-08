@@ -449,7 +449,7 @@ fn rebase_revisions(
         ui,
         workspace_command,
         &new_parents.iter().ids().cloned().collect_vec(),
-        &new_children,
+        &new_children.iter().ids().cloned().collect_vec(),
         target_commits,
         rebase_options,
     )
@@ -486,7 +486,7 @@ fn rebase_source(
         ui,
         workspace_command,
         &new_parents.iter().ids().cloned().collect_vec(),
-        &new_children,
+        &new_children.iter().ids().cloned().collect_vec(),
         source_commits,
         rebase_options,
     )
@@ -539,7 +539,7 @@ fn rebase_branch(
         ui,
         workspace_command,
         &new_parent_ids,
-        &new_children,
+        &new_children.iter().ids().cloned().collect_vec(),
         root_commits,
         rebase_options,
     )
@@ -549,7 +549,7 @@ fn rebase_descendants_transaction(
     ui: &mut Ui,
     workspace_command: &mut WorkspaceCommandHelper,
     new_parent_ids: &[CommitId],
-    new_children: &[Commit],
+    new_children_ids: &[CommitId],
     target_roots: Vec<Commit>,
     rebase_options: &RebaseOptions,
 ) -> Result<(), CommandError> {
@@ -574,7 +574,7 @@ fn rebase_descendants_transaction(
     let stats = move_commits(
         tx.repo_mut(),
         new_parent_ids,
-        new_children,
+        new_children_ids,
         &MoveCommitsTarget::Roots(target_roots),
         rebase_options,
     )?;
@@ -587,7 +587,7 @@ fn rebase_revisions_transaction(
     ui: &mut Ui,
     workspace_command: &mut WorkspaceCommandHelper,
     new_parent_ids: &[CommitId],
-    new_children: &[Commit],
+    new_children_ids: &[CommitId],
     target_commits: Vec<Commit>,
     rebase_options: &RebaseOptions,
 ) -> Result<(), CommandError> {
@@ -610,7 +610,7 @@ fn rebase_revisions_transaction(
     let stats = move_commits(
         tx.repo_mut(),
         new_parent_ids,
-        new_children,
+        new_children_ids,
         &MoveCommitsTarget::Commits(target_commits),
         rebase_options,
     )?;
