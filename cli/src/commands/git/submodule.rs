@@ -16,12 +16,13 @@ use std::io::Write;
 
 use clap::Subcommand;
 use jj_lib::backend::TreeValue;
-use jj_lib::git::parse_gitmodules;
+use jj_lib::git::get_git_repo;
 use jj_lib::repo::Repo;
 use jj_lib::repo_path::RepoPath;
 
 use crate::cli_util::CommandHelper;
 use crate::cli_util::RevisionArg;
+use crate::command_error::internal_error_with_message;
 use crate::command_error::user_error;
 use crate::command_error::CommandError;
 use crate::ui::Ui;
@@ -77,15 +78,23 @@ fn cmd_submodule_print(
         }
     };
 
-    let submodules = parse_gitmodules(&mut gitmodules_file)?;
-    for (name, submodule) in submodules {
-        writeln!(
-            ui.stdout(),
-            "name:{}\nurl:{}\npath:{}\n\n",
-            name,
-            submodule.url,
-            submodule.path
-        )?;
+    let mut gitmodules_bytes = vec![];
+    gitmodules_file.read_to_end(&mut gitmodules_bytes)?;
+
+    fn handle_err(err: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> CommandError {
+        internal_error_with_message("Failed to parse Git submodule config", err)
+    }
+
+    let submodule_config = gix::submodule::File::from_bytes(
+        &gitmodules_bytes,
+        None,
+        &get_git_repo(repo.store())?.config_snapshot(),
+    )
+    .map_err(handle_err)?;
+    for name in submodule_config.names() {
+        let path = submodule_config.path(name).map_err(handle_err)?;
+        let url = submodule_config.url(name).map_err(handle_err)?;
+        writeln!(ui.stdout(), "name:{name}\nurl:{url}\npath:{path}\n\n")?;
     }
     Ok(())
 }
